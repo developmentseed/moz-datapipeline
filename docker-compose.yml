@@ -1,0 +1,19 @@
+version: '3.2'
+
+services:
+  moz-datapipeline:
+    build: ./
+    container_name: moz-datapipeline
+    volumes:
+      - type: bind
+        source: ./output
+        target: /var/pipeline/output
+      - type: bind
+        source: ./source
+        target: /var/pipeline/source
+        read_only: true
+    command: bash ./main.sh
+
+volumes:
+  output:
+  source:
