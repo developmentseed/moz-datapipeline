@@ -12,7 +12,7 @@ TMP_DIR=./.tmp
 #   3. variable name to assign the full path to
 #
 # Example:
-#   checkBaseFile './source/road-network' '*.shp' RN_FILE
+#   checkRequiredFile './source/road-network' '*.shp' RN_FILE
 
 function checkRequiredFile() {
   # Check if the source directory exists
@@ -45,7 +45,7 @@ checkRequiredFile './source/admin-boundaries' '*.shp' AA_FILE
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
-  rm -r $TMP_DIR
+  rm -rf $TMP_DIR
 fi
 mkdir $TMP_DIR
 
