@@ -2,7 +2,19 @@
 This repository contains the data pipeline that prepares Vector Tiles for use by the [Road Planning Tool](https://github.com/developmentseed/moz-road-planning).
 
 ### Usage
-...
+Run the pipeline using:
+
+```
+docker-compose up
+```
+
+If you make a change to one of the scripts, run the following to rebuild the image and run the pipeline again:
+
+
+```
+docker-compose up --build
+```
+
 
 ### Repository structure
 
