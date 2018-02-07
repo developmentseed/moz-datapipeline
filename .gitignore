@@ -1,3 +1,5 @@
 output/*
 *.~lock.*
 .tmp
+.resources
+.DS_Store
