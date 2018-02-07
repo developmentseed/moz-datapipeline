@@ -69,15 +69,22 @@ mkdir $TMP_DIR
 #       DISTRICT (String) - Example: Chigubo
 #       PROVINCE (String) - Example: Gaza
 #       AADT (Real) - average annual daily traffic Example: 70.000000
+#   - remove features that have no geometry
 #   - reproject to EPSG:4326
+#   - store it in Shapefile and GeoJSON format
 
 # Write to temp file. This is a separate command so we know the layer name in subsequent ones
 ogr2ogr $TMP_DIR/roadnetwork.shp "$RN_FILE" \
   -t_srs "EPSG:4326"
 
 ogr2ogr -overwrite $TMP_DIR/roadnetwork.shp $TMP_DIR/roadnetwork.shp \
-  -sql "SELECT NAME, ROAD_NAME, START_LOC, STA_POINT, END_LOC, END_POINT, ROAD_CLASS, SURF_TYPE, PAVE_WIDTH, AVG_COND, DISTRICT, PROVINCE, AADT FROM roadnetwork" \
+  -dialect sqlite \
+  -sql "SELECT NAME, ROAD_NAME, START_LOC, STA_POINT, END_LOC, END_POINT, ROAD_CLASS, SURF_TYPE, PAVE_WIDTH, AVG_COND, DISTRICT, PROVINCE, AADT, geometry \
+    FROM roadnetwork \
+    WHERE geometry is not null" \
   -nln roadnetwork
+
+ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp
 
 
 ###############################################################################
