@@ -1,9 +1,17 @@
 version: '3.2'
 
 services:
+  base:
+    build:
+      context: .
+    image: 'moz-datapipeline'
+    env_file: .env
+    volumes:
+      - '.:/home/geolambda/work'
+
   moz-datapipeline:
-    build: ./
     container_name: moz-datapipeline
+    env_file: .env
     volumes:
       - type: bind
         source: ./output

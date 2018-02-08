@@ -1,9 +1,16 @@
-FROM ubuntu:latest
+FROM developmentseed/geolambda:cloud
 
-RUN mkdir -p /var/pipeline
-WORKDIR /var/pipeline
-COPY ./main.sh /var/pipeline
-COPY ./scripts /var/pipeline/scripts
+# install any Python dependencies
+COPY requirements.txt $BUILD/requirements.txt
+RUN \
+    pip install -r requirements.txt
 
-RUN apt-get update
-RUN apt-get install -y gdal-bin
+# home
+ENV HOME /home/geolambda
+WORKDIR /home/geolambda
+
+# copy scripts
+COPY main.sh $HOME/main.sh
+COPY scripts $HOME/scripts
+
+
