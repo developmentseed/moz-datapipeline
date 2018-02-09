@@ -9,16 +9,16 @@ services:
     volumes:
       - '.:/home/geolambda/work'
 
-  moz-datapipeline:
-    container_name: moz-datapipeline
+  pipeline:
+    image: moz-datapipeline
     env_file: .env
     volumes:
       - type: bind
         source: ./output
-        target: /var/pipeline/output
+        target: /home/moz/output
       - type: bind
         source: ./source
-        target: /var/pipeline/source
+        target: /home/moz/source
         read_only: true
     command: bash ./main.sh
 

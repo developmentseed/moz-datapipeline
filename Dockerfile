@@ -6,8 +6,8 @@ RUN \
     pip install -r requirements.txt
 
 # home
-ENV HOME /home/geolambda
-WORKDIR /home/geolambda
+ENV HOME /home/moz
+WORKDIR $HOME
 
 # copy scripts
 COPY main.sh $HOME/main.sh

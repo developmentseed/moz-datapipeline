@@ -2,7 +2,7 @@
 # This script performs basic housekeeping and prepares the base data used by
 # the scripts that calculate the indicators.
 
-TMP_DIR=./.tmp
+TMP_DIR=/home/moz/.tmp
 
 # Check if a required file exists and assign the full path to a variable.
 #
