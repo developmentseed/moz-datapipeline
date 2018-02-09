@@ -53,7 +53,7 @@ function run () {
     const wayBbox = bbox(way);
 
     tStart(`Way ${id} search`)()
-    // check which areas intersect with the bbox of the way
+    // Check which areas intersect with the bbox of the way.
     const featsInBbox = tree.search({
       minX: wayBbox[0],
       minY: wayBbox[1],
@@ -75,22 +75,30 @@ function run () {
       const splitWays = lineSplit(way, area)
 
       // If splitWays is empty, this means that the way is either fully inside
-      // or fully outside the area
+      // or fully outside the area.
       if (!splitWays.features.length) {
         if (pointWithinPolygon(turf.point(way.geometry.coordinates[0]), area).features.length) {
           // If a way is fully within a single area, we don't have to weigh the
-          // indicator
+          // indicator.
           return acc + area.properties.Pov_HeadCn
         } else {
           return acc
         }
       } else {
-        // in theory, a way can have multiple separate segments within an area
+        // A way can have multiple separate segments within an area, which is
+        // why a second reduce is necessary.
         return acc + splitWays.features.reduce((accumulator, partialWay) => {
-          // check if the middle coordinate of a way is within the area polygon
-          const middleCoord = partialWay.geometry.coordinates[Math.floor(partialWay.geometry.coordinates.length / 2)]
-          if (pointWithinPolygon(turf.point(middleCoord), area).features.length) {
-            // when it does, weigh the indicator by the length of the partial segment
+          // Get a point between the first and second point of the way.
+          // pointWithinPolygon doesn't return points that are on the edge of
+          // the polygon, which is why we don't rely on first or last.
+          coords = [
+            (partialWay.geometry.coordinates[0][0] + partialWay.geometry.coordinates[1][0]) / 2,
+            (partialWay.geometry.coordinates[0][1] + partialWay.geometry.coordinates[1][1]) / 2
+          ]
+
+          // Check if the partialWay is within the area polygon.
+          if (pointWithinPolygon(turf.point(coords), area).features.length) {
+            // Weigh the indicator by the length of the partial segment.
             return accumulator + (length(partialWay) * area.properties.Pov_HeadCn / wayLength)
           } else {
             return accumulator
