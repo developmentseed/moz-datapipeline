@@ -1,13 +1,15 @@
 const fs = require('fs-extra');
 const Promise = require('bluebird');
 const nodeCleanup = require('node-cleanup');
-const buffer = require('@turf/buffer');
-const intersect = require('@turf/intersect');
+const lineSplit = require('@turf/line-split');
+const pointWithinPolygon = require('@turf/points-within-polygon')
 const bbox = require('@turf/bbox');
+const turf = require('@turf/helpers')
+const length = require('@turf/length')
 const rbush = require('rbush');
 
 // File path for origin/destination pairs.
-const POI_FILE = 'src/areas.geojson';
+const POI_FILE = './poverty.geojson';
 // Ways list.
 const RN_FILE = '../output/roadnetwork.geojson';
 
@@ -48,10 +50,10 @@ function run () {
   const out = ways.map((way, idx) => {
     const id = `${idx + 1}/${ways.length}`;
     clog(`Handling way ${id}`);
-    const wayBuff = buffer(way, 5, { units: 'meters'});
-    const wayBbox = bbox(wayBuff);
+    const wayBbox = bbox(way);
 
     tStart(`Way ${id} search`)()
+    // check which areas intersect with the bbox of the way
     const featsInBbox = tree.search({
       minX: wayBbox[0],
       minY: wayBbox[1],
@@ -60,22 +62,48 @@ function run () {
     }).map(r => r.feat);
     tEnd(`Way ${id} search`)()
 
-    clog(`Way ${id}`, featsInBbox.length, 'feats in bbox');
+    clog(`Way ${id} intersects with`, featsInBbox.length, 'area bounding boxes.');
 
-    tStart(`Way ${id} intersect`)()
-    const featsIntersect = featsInBbox.reduce((acc, area) => {
-      return intersect(wayBuff, area) ? acc.concat(area) : acc;
-    }, []);
-    tEnd(`Way ${id} intersect`)()
+    tStart(`Way ${id} weigh indicator`)()
 
-    clog(`Way ${id}`, featsIntersect.length, 'feats intersect');
+    const wayLength = length(way)
+
+    // Calculate the weighted indicator for this way.
+    const weightedIndicator = featsInBbox.reduce((acc, area) => {
+      // Split the way by the area polygon. This results in a feature coll of
+      // split lines.
+      const splitWays = lineSplit(way, area)
+
+      // If splitWays is empty, this means that the way is either fully inside
+      // or fully outside the area
+      if (!splitWays.features.length) {
+        if (pointWithinPolygon(turf.point(way.geometry.coordinates[0]), area).features.length) {
+          // If a way is fully within a single area, we don't have to weigh the
+          // indicator
+          return acc + area.properties.Pov_HeadCn
+        } else {
+          return acc
+        }
+      } else {
+        // in theory, a way can have multiple separate segments within an area
+        return acc + splitWays.features.reduce((accumulator, partialWay) => {
+          // check if the middle coordinate of a way is within the area polygon
+          const middleCoord = partialWay.geometry.coordinates[Math.floor(partialWay.geometry.coordinates.length / 2)]
+          if (pointWithinPolygon(turf.point(middleCoord), area).features.length) {
+            // when it does, weigh the indicator by the length of the partial segment
+            return accumulator + (length(partialWay) * area.properties.Pov_HeadCn / wayLength)
+          } else {
+            return accumulator
+          }
+        }, 0)
+      }
+    }, 0)
+
+    tEnd(`Way ${id} weigh indicator`)()
 
     return {
       wayId: way.properties.NAME,
-      count: featsIntersect.length,
-      ag: featsIntersect.reduce((acc, f) => {
-        return acc + f.properties.ag_bykm * f.properties.area;
-      }, 0)
+      indicator: weightedIndicator
     }
   });
 
