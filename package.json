@@ -22,7 +22,10 @@
     "fs-extra": "^5.0.0",
     "glob": "^7.1.2",
     "lodash.camelcase": "^4.3.0",
-    "node-cleanup": "^2.1.2"
+    "node-cleanup": "^2.1.2",
+    "osm2obj": "^3.0.0",
+    "osrm": "^5.15.2",
+    "through2": "^2.0.3"
   },
   "devDependencies": {
     "eslint": "^4.10.0",
