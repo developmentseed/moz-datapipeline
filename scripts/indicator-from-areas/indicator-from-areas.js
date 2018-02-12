@@ -67,6 +67,13 @@ const ways = fs.readJsonSync(RN_FILE).features;
 clog('Loading Source Data');
 const areasData = fs.readJsonSync(AREAS_FILE);
 
+/**
+ * Creates rbush tree form the bbox of input features.
+ *
+ * @param  {Object} areas   Input FeatureCollection
+ *
+ * @return {Object}         Rbush tree
+ */
 function prepTree (areas) {
   clog('Create rbush tree');
 
@@ -94,6 +101,15 @@ function dataToCSV (data) {
   });
 }
 
+/**
+ * Runs the analysis, calculating a weighted score for each way.
+ *
+ * @param  {Array} ways         Road netowrk ways.
+ * @param  {Object} tree        Rbush tree.
+ * @param  {String} indProperty Property to get value from.
+ *
+ * @return Promise{}            Resolves when file was written.
+ */
 async function run (ways, tree, indProperty) {
   const waysScore = ways.map((way, idx) => {
     const id = `${idx + 1}/${ways.length}`;
