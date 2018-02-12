@@ -1,0 +1,36 @@
+{
+  "name": "moz-datapipeline",
+  "version": "0.0.1",
+  "description": "Process data for Mozambique Road Planning tool",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/developmentseed/moz-datapipeline"
+  },
+  "author": {
+    "name": "Development Seed",
+    "url": "https://developmentseed.org"
+  },
+  "scripts": {
+    "lint": "eslint ./ --ext .js"
+  },
+  "engines": {
+    "node": "6.x.x"
+  },
+  "dependencies": {
+    "@turf/bbox": "^5.1.5",
+    "@turf/buffer": "^5.1.5",
+    "@turf/intersect": "^5.1.6",
+    "@turf/line-split": "^5.1.5",
+    "@turf/turf": "^5.1.6",
+    "csv-stringify": "^2.0.2",
+    "fs-extra": "^5.0.0",
+    "node-cleanup": "^2.1.2",
+    "rbush": "^2.0.2",
+  },
+  "devDependencies": {
+    "eslint": "^3.0.1",
+    "eslint-config-standard": "^6.0.0-beta",
+    "eslint-plugin-promise": "^3.3.0",
+    "eslint-plugin-standard": "^2.0.0"
+  }
+}

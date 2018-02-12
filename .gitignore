@@ -3,3 +3,5 @@ output/*
 .tmp
 .resources
 .DS_Store
+node_modules
+yarn-error.log
