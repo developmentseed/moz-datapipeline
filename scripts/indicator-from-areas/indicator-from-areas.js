@@ -1,25 +1,55 @@
 'use strict';
-const fs = require('fs-extra');
-const nodeCleanup = require('node-cleanup');
-const lineSplit = require('@turf/line-split');
-const pointWithinPolygon = require('@turf/points-within-polygon');
-const bbox = require('@turf/bbox');
-const turf = require('@turf/helpers');
-const length = require('@turf/length');
-const rbush = require('rbush');
-const csvStringify = require('csv-stringify');
+import fs from 'fs-extra';
+import path from 'path';
+import Promise from 'bluebird';
+import nodeCleanup from 'node-cleanup';
+import lineSplit from '@turf/line-split';
+import pointWithinPolygon from '@turf/points-within-polygon';
+import bbox from '@turf/bbox';
+import { point } from '@turf/helpers';
+import length from '@turf/length';
+import rbush from 'rbush';
+import csvStringify from 'csv-stringify';
 
-// This script derives indicators for road segments from underlying polygons.
-// It requires two files:
-//   1. a GeoJSON with polygons that contain indicator data (eg. poverty rate
-//      per district)
-//   2. a GeoJSON with road network data
-//
-// For each of the road segments, it checks the polygons it intersects with and
-// calculate a weighted average.
-//
-// Usage:
-//  $node ./scripts/indicator-from-areas.js .tmp/district-boundaries.geojson POV_HCR poverty
+import {tStart, tEnd} from '../utils/logging';
+
+/**
+ * This script derives indicators for road segments from underlying polygons.
+ * It requires two files:
+ *   1. a GeoJSON with polygons that contain indicator data (eg. poverty rate
+ *      per district) - provided as input
+ *   2. a GeoJSON with road network data - hardcoded
+ *
+ * For each of the road segments, it checks the polygons it intersects with and
+ * calculate a weighted average.
+ *
+ * Usage:
+ *  $node ./scripts/indicator-from-areas.js .tmp/district-boundaries.geojson POV_HCR poverty
+ *
+ */
+
+// This script requires 3 parameters.
+const [, , AREAS_FILE, PROPERTY, IND_NAME] = process.argv;
+
+if (!AREAS_FILE || !PROPERTY || !IND_NAME) {
+  console.log(`This script requires three parameters to run:
+  1. a GeoJSON with polygons; and
+  2. the property on each GeoJSON feature that contains the indicator data
+  3. the name of the indicator that will be used to name the file with results
+  
+  Eg. $node ./scripts/indicator-from-areas .tmp/district-boundaries.geojson POV_HCR poverty`);
+
+  process.exit(1);
+}
+
+// //////////////////////////////////////////////////////////
+// Config Vars
+
+const OUTPUT_DIR = path.resolve(__dirname, '../../output');
+const LOG_DIR = path.resolve(__dirname, '../../log/indicator-from-areas');
+
+const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
+const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
 
 // Store all the logs to write them to a file on exit.
 var logData = [];
@@ -29,19 +59,19 @@ function clog (...args) {
 }
 // Write logging to file.
 nodeCleanup(function (exitCode, signal) {
-  fs.writeFileSync(`run/log-${Date.now()}.txt`, logData.join('\n'));
+  fs.writeFileSync(`${LOG_DIR}/log-${Date.now()}.txt`, logData.join('\n'));
 });
 
-function loadFile (fn) {
-  clog('Load', fn);
-  return JSON.parse(fs.readFileSync(fn, 'utf8'));
-}
+clog('Loading Road Network');
+const ways = fs.readJsonSync(RN_FILE).features;
+clog('Loading Source Data');
+const areasData = fs.readJsonSync(AREAS_FILE);
 
-function prepTree (data) {
+function prepTree (areas) {
   clog('Create rbush tree');
 
   var tree = rbush();
-  tree.load(data[0].features.map(f => {
+  tree.load(areas.features.map(f => {
     let b = bbox(f);
     return {
       minX: b[0],
@@ -51,16 +81,21 @@ function prepTree (data) {
       feat: f
     };
   }));
-  data.push(tree);
   clog('Create rbush tree... done');
-  return data;
+  return tree;
 }
 
-function run (data, indicator) {
-  const ways = data[1].features;
-  const tree = data[2];
+function dataToCSV (data) {
+  return new Promise((resolve, reject) => {
+    csvStringify(data, {header: true}, (err, output) => {
+      if (err) return reject(err);
+      return resolve(output);
+    });
+  });
+}
 
-  const out = ways.map((way, idx) => {
+async function run (ways, tree, indProperty) {
+  const waysScore = ways.map((way, idx) => {
     const id = `${idx + 1}/${ways.length}`;
     clog(`Handling way ${id}`);
     const wayBbox = bbox(way);
@@ -90,10 +125,10 @@ function run (data, indicator) {
       // If splitWays is empty, this means that the way is either fully inside
       // or fully outside the area.
       if (!splitWays.features.length) {
-        if (pointWithinPolygon(turf.point(way.geometry.coordinates[0]), area).features.length) {
+        if (pointWithinPolygon(point(way.geometry.coordinates[0]), area).features.length) {
           // If a way is fully within a single area, we don't have to weigh the
           // indicator.
-          return acc + area.properties[indicator];
+          return acc + area.properties[indProperty];
         } else {
           return acc;
         }
@@ -110,9 +145,9 @@ function run (data, indicator) {
           ];
 
           // Check if the partialWay is within the area polygon.
-          if (pointWithinPolygon(turf.point(coords), area).features.length) {
+          if (pointWithinPolygon(point(coords), area).features.length) {
             // Weigh the indicator by the length of the partial segment.
-            return accumulator + (length(partialWay) * area.properties[indicator] / wayLength);
+            return accumulator + (length(partialWay) * area.properties[indProperty] / wayLength);
           } else {
             return accumulator;
           }
@@ -123,62 +158,27 @@ function run (data, indicator) {
 
     return {
       wayId: way.properties.NAME,
-      indicator: weightedIndicator
+      score: weightedIndicator
     };
   });
 
-  dataToFile(`.tmp/indicator/${process.argv[4]}.csv`)(out);
+  const csv = await dataToCSV(waysScore);
+  return fs.writeFile(OUTPUT_INDICATOR_FILE, csv);
 }
 
-// /////////////////////////////////////////////////////////////////////////////
-
-function tStart (name) {
-  return (data) => {
-    console.time(name);
-    return Promise.resolve(data);
-  };
-}
-
-function tEnd (name) {
-  return (data) => {
-    console.timeEnd(name);
-    return Promise.resolve(data);
-  };
-}
-
-function dataToFile (name) {
-  return (data) => {
-    csvStringify(data, {header: true}, function (err, output) {
-      fs.writeFileSync(name, output);
-    });
-    return Promise.resolve(data);
-  };
-}
-
-// This script requires 3 parameters
-if (process.argv.length !== 5) {
-  clog(`This script requires three parameters to run:\n
-  1. a GeoJSON with polygons; and
-  2. the property on each GeoJSON feature that contains the indicator data\n
-  3. the name of the indicator that will be used to name the file with results\n
-Eg. $node ./scripts/indicator-from-areas.js .tmp/district-boundaries.geojson POV_HCR poverty`);
-  process.exit(1);
-} else {
-  Promise.all([
-    fs.ensureDir('run')
-  ])
-  .then(tStart(`Total run time`))
-  .then(() => {
-    return Promise.all([
-      loadFile(process.argv[2]),
-      loadFile('.tmp/roadnetwork.geojson')
+(async function main () {
+  try {
+    await Promise.all([
+      fs.ensureDir(OUTPUT_DIR),
+      fs.ensureDir(LOG_DIR)
     ]);
-  })
-  .then((data) => prepTree(data))
-  .then((data) => run(data, process.argv[3]))
-  .then(tEnd(`Total run time`))
-  .catch(e => {
-    console.log('e', e);
-    throw e;
-  });
-}
+
+    tStart(`Total run time`)();
+    const tree = prepTree(areasData);
+
+    await run(ways, tree, PROPERTY);
+    tEnd(`Total run time`)();
+  } catch (e) {
+    console.log(e);
+  }
+}());
