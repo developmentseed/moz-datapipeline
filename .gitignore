@@ -1,6 +1,7 @@
 output/*
 *.~lock.*
 .tmp
+log/
 .resources
 .DS_Store
 node_modules

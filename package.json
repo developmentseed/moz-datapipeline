@@ -1,20 +1,15 @@
 {
   "name": "moz-datapipeline",
-  "version": "0.0.1",
-  "description": "Process data for Mozambique Road Planning tool",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/developmentseed/moz-datapipeline"
-  },
-  "author": {
-    "name": "Development Seed",
-    "url": "https://developmentseed.org"
-  },
+  "version": "0.1.0",
+  "description": "",
   "scripts": {
-    "lint": "eslint ./ --ext .js"
+    "lint": "eslint scripts/ --ext .js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "author": "Development Seed <dev@developmentseed.org> (https://developmentseed.org)",
+  "license": "MIT",
   "engines": {
-    "node": "6.x.x"
+    "node": "6.x"
   },
   "dependencies": {
     "@turf/bbox": "^5.1.5",
@@ -22,15 +17,29 @@
     "@turf/intersect": "^5.1.6",
     "@turf/line-split": "^5.1.5",
     "@turf/turf": "^5.1.6",
+    "babel-plugin-syntax-async-functions": "^6.13.0",
+    "babel-plugin-transform-regenerator": "^6.26.0",
+    "babel-polyfill": "^6.26.0",
+    "babel-preset-es2015": "^6.24.0",
+    "babel-register": "^6.23.0",
+    "bluebird": "^3.5.1",
     "csv-stringify": "^2.0.2",
+    "csvtojson": "^1.1.9",
     "fs-extra": "^5.0.0",
+    "glob": "^7.1.2",
+    "lodash.camelcase": "^4.3.0",
     "node-cleanup": "^2.1.2",
+    "osm2obj": "^3.0.0",
+    "osrm": "^5.15.2",
     "rbush": "^2.0.2",
+    "through2": "^2.0.3"
   },
   "devDependencies": {
-    "eslint": "^3.0.1",
-    "eslint-config-standard": "^6.0.0-beta",
-    "eslint-plugin-promise": "^3.3.0",
-    "eslint-plugin-standard": "^2.0.0"
+    "eslint": "^4.10.0",
+    "eslint-config-standard": "^11.0.0-beta.0",
+    "eslint-plugin-import": "^2.8.0",
+    "eslint-plugin-node": "^5.2.1",
+    "eslint-plugin-promise": "^3.6.0",
+    "eslint-plugin-standard": "^3.0.1"
   }
 }

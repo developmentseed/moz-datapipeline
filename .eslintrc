@@ -1,15 +1,15 @@
 {
   "extends": ["standard"],
   "env": {
-    "es6": true,
-    "mocha": true
+    "es6": true
   },
   "parserOptions": {
-    "ecmaVersion": 6
+    "ecmaVersion": 2017
   },
   "rules": {
     "semi": [2, "always"],
     "no-extra-semi": 2,
-    "semi-spacing": [2, { "before": false, "after": true }]
+    "semi-spacing": [2, { "before": false, "after": true }],
+    "prefer-promise-reject-errors": 0
   }
 }
