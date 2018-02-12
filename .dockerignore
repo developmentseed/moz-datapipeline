@@ -1,0 +1,5 @@
+.resources/
+.tmp/
+log/
+node_modules/
+output/
