@@ -13,7 +13,6 @@ import {tStart, tEnd, jsonToFile} from '../utils/logging';
 // Config Vars
 
 const OUTPUT_DIR = path.resolve(__dirname, '../../output');
-const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/merge-indicators');
 
 const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
@@ -34,7 +33,7 @@ nodeCleanup(function (exitCode, signal) {
 });
 
 // rnData will be modified by the functions.
-var rnData = JSON.parse(fs.readFileSync(RN_FILE, 'utf8'));
+var rnData = fs.readJsonSync(RN_FILE);
 
 /**
  * Run function.
@@ -133,13 +132,16 @@ function attachIndicatorToRN (filePath) {
 }
 
 (async function main () {
-  await Promise.all([
-    fs.ensureDir(OUTPUT_DIR),
-    fs.ensureDir(TMP_DIR),
-    fs.ensureDir(LOG_DIR)
-  ]);
+  try {
+    await Promise.all([
+      fs.ensureDir(OUTPUT_DIR),
+      fs.ensureDir(LOG_DIR)
+    ]);
 
-  tStart(`Total run time`)();
-  await run();
-  tEnd(`Total run time`)();
+    tStart(`Total run time`)();
+    await run();
+    tEnd(`Total run time`)();
+  } catch (e) {
+    console.log(e);
+  }
 }());
