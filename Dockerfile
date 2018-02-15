@@ -1,16 +1,11 @@
-FROM developmentseed/geolambda:cloud
+FROM ubuntu:latest
 
-# install any Python dependencies
-COPY requirements.txt $BUILD/requirements.txt
-RUN \
-    pip install -r requirements.txt
+COPY install.sh /
 
-# home
-ENV HOME /home/moz
-WORKDIR $HOME
+RUN bash install.sh
+ENV PATH="/root/.local/bin:${PATH}"
 
-# copy scripts
-COPY main.sh $HOME/main.sh
-COPY scripts $HOME/scripts
-
-
+RUN mkdir -p /var/pipeline
+WORKDIR /var/pipeline
+COPY ./main.sh /var/pipeline
+COPY ./scripts /var/pipeline/scripts
