@@ -8,7 +8,7 @@ services:
     env_file: .env
     entrypoint: /bin/bash
     volumes:
-      - '.:/home/moz/work'
+      - '.:/var/pipeline/work'
 
   pipeline:
     image: moz-datapipeline
@@ -16,10 +16,10 @@ services:
     volumes:
       - type: bind
         source: ./output
-        target: /home/moz/output
+        target: /var/pipeline/output
       - type: bind
         source: ./source
-        target: /home/moz/source
+        target: /var/pipeline/source
         read_only: true
     command: bash ./main.sh
 
