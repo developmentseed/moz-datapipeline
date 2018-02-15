@@ -41,7 +41,8 @@ function checkRequiredFile() {
 
 # Check for required files and directories
 checkRequiredFile './source/road-network' '*.shp' RN_FILE
-checkRequiredFile './source/admin-boundaries' '*.shp' AA_FILE
+checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
+checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
@@ -89,29 +90,48 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp
 
 ###############################################################################
 #
-# 2. Generate base admin boundary data
+# 2. Generate base boundary data for the provinces. This will mostly be used
+# in the frontend for display.
 #
 
 # Write to temp file. This is a separate command so we know the layer name in subsequent ones
-ogr2ogr $TMP_DIR/boundaries.shp "$AA_FILE" \
+ogr2ogr $TMP_DIR/prov_boundaries.shp "$PROVINCE_FILE" \
   -t_srs "EPSG:4326"
 
 # Filter features and fields
-ogr2ogr -overwrite $TMP_DIR/boundaries.shp $TMP_DIR/boundaries.shp \
+ogr2ogr -overwrite $TMP_DIR/prov_boundaries.shp $TMP_DIR/prov_boundaries.shp \
   -sql "SELECT \
     name, iso_3166_2, iso_a2, type \
-    FROM boundaries \
+    FROM prov_boundaries \
     WHERE iso_a2='MZ'" \
-  -nln boundaries
+  -nln prov_boundaries
 
 # Make sure the Maputo City (MZ-MPM) has the same ISO as the province (MZ-L)
-ogrinfo boundaries.shp \
-  -dialect sqlite -sql "UPDATE boundaries \
+ogrinfo prov_boundaries.shp \
+  -dialect sqlite -sql "UPDATE prov_boundaries \
     SET iso_3166_2='MZ-L' \
     WHERE iso_3166_2='MZ-MPM'" \
   >/dev/null
 
 # Merge Maputo the city and Maputo the province into one polygon
-ogr2ogr -overwrite $TMP_DIR/boundaries.shp $TMP_DIR/boundaries.shp \
-  -dialect sqlite -sql "SELECT ST_union(Geometry),* FROM boundaries GROUP BY iso_3166_2" \
-  -nln boundaries
+ogr2ogr -overwrite $TMP_DIR/prov_boundaries.shp $TMP_DIR/prov_boundaries.shp \
+  -dialect sqlite -sql "SELECT ST_union(Geometry),* FROM prov_boundaries GROUP BY iso_3166_2" \
+  -nln prov_boundaries
+
+
+###############################################################################
+#
+# 3. Generate base boundary data for the districts. This will mostly be used
+# to generate the indicators on district level.
+#
+
+# Write to temp file. This is a separate command so we know the layer name in subsequent ones
+ogr2ogr $TMP_DIR/district_boundaries.shp "$DISTRICT_FILE" \
+  -t_srs "EPSG:4326"
+
+# Filter features and fields
+ogr2ogr -f "GeoJSON" $TMP_DIR/district_boundaries.geojson $TMP_DIR/district_boundaries.shp \
+  -sql "SELECT \
+    ZS_ID, SUBDIST, POV_HCR \
+    FROM district_boundaries" \
+  -nln district_boundaries

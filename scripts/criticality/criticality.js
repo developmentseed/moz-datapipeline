@@ -33,8 +33,8 @@ nodeCleanup(function (exitCode, signal) {
   fs.writeFileSync(`${LOG_DIR}/log-${Date.now()}.txt`, logData.join('\n'));
 });
 
-const odPairs = JSON.parse(fs.readFileSync(OD_FILE, 'utf8'));
-var ways = JSON.parse(fs.readFileSync(WAYS_FILE, 'utf8'));
+const odPairs = fs.readJsonSync(OD_FILE);
+var ways = fs.readJsonSync(WAYS_FILE);
 
 clog('Using OD Pairs', OD_FILE);
 
@@ -331,14 +331,18 @@ function createSpeedProfile (speedProfileFile, way) {
 }
 
 (async function main () {
-  await Promise.all([
-    fs.ensureDir(OUTPUT_DIR),
-    fs.ensureDir(TMP_DIR),
-    fs.ensureDir(`${LOG_DIR}/ways-times`),
-    fs.ensureDir(`${LOG_DIR}/osm-contract-logs`)
-  ]);
+  try {
+    await Promise.all([
+      fs.ensureDir(OUTPUT_DIR),
+      fs.ensureDir(TMP_DIR),
+      fs.ensureDir(`${LOG_DIR}/ways-times`),
+      fs.ensureDir(`${LOG_DIR}/osm-contract-logs`)
+    ]);
 
-  tStart(`Total run time`)();
-  await run(ways, odPairs);
-  tEnd(`Total run time`)();
+    tStart(`Total run time`)();
+    await run(ways, odPairs);
+    tEnd(`Total run time`)();
+  } catch (e) {
+    console.log(e);
+  }
 }());
