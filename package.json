@@ -26,6 +26,7 @@
     "csv-stringify": "^2.0.2",
     "csvtojson": "^1.1.9",
     "fs-extra": "^5.0.0",
+    "geojson-join": "^1.0.0",
     "glob": "^7.1.2",
     "lodash.camelcase": "^4.3.0",
     "node-cleanup": "^2.1.2",
