@@ -138,3 +138,11 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/district_boundaries.geojson $TMP_DIR/district_boun
     ZS_ID, SUBDIST, POV_HCR \
     FROM district_boundaries" \
   -nln district_boundaries
+
+
+###############################################################################
+#
+# 4. Additional properties to be included in the roadnetwork geojson
+#
+
+node ./scripts/additional-props/index.js
