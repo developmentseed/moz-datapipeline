@@ -4,10 +4,9 @@ import path from 'path';
 import Promise from 'bluebird';
 import glob from 'glob';
 import csv from 'csvtojson';
-import nodeCleanup from 'node-cleanup';
 import camelcase from 'lodash.camelcase';
 
-import {tStart, tEnd, jsonToFile} from '../utils/logging';
+import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
 
 // //////////////////////////////////////////////////////////
 // Config Vars
@@ -21,16 +20,7 @@ const OUTPUT_RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork-indicators.geojson'
 // Number of concurrent operations to run.
 const CONCURR_OPS = 5;
 
-// Store all the logs to write them to a file on exit.
-var logData = [];
-function clog (...args) {
-  logData.push(args.join(' '));
-  console.log(...args);
-}
-// Write logging to file.
-nodeCleanup(function (exitCode, signal) {
-  fs.writeFileSync(`${LOG_DIR}/log-${Date.now()}.txt`, logData.join('\n'));
-});
+const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 // rnData will be modified by the functions.
 var rnData = fs.readJsonSync(RN_FILE);

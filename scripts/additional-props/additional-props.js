@@ -2,10 +2,9 @@
 import fs from 'fs-extra';
 import path from 'path';
 import Promise from 'bluebird';
-import nodeCleanup from 'node-cleanup';
 import length from '@turf/length';
 
-import { tStart, tEnd } from '../utils/logging';
+import { tStart, tEnd, initLog } from '../utils/logging';
 
 // Include additional properties on the Road Network:
 // - Province the road runs through
@@ -20,16 +19,7 @@ const LOG_DIR = path.resolve(__dirname, '../../log/additional-props');
 const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
 const BOUND_FILES = path.resolve(OUTPUT_DIR, 'prov_boundaries.geojson');
 
-// Store all the logs to write them to a file on exit.
-var logData = [];
-function clog (...args) {
-  logData.push(args.join(' '));
-  console.log(...args);
-}
-// Write logging to file.
-nodeCleanup(function (exitCode, signal) {
-  fs.writeFileSync(`${LOG_DIR}/log-${Date.now()}.txt`, logData.join('\n'));
-});
+const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Loading province boundaries');
 const provBoundaries = fs.readJsonSync(BOUND_FILES);

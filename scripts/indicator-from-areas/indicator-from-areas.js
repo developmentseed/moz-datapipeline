@@ -2,7 +2,6 @@
 import fs from 'fs-extra';
 import path from 'path';
 import Promise from 'bluebird';
-import nodeCleanup from 'node-cleanup';
 import lineSplit from '@turf/line-split';
 import pointWithinPolygon from '@turf/points-within-polygon';
 import bbox from '@turf/bbox';
@@ -11,7 +10,7 @@ import length from '@turf/length';
 import rbush from 'rbush';
 import csvStringify from 'csv-stringify';
 
-import {tStart, tEnd} from '../utils/logging';
+import { tStart, tEnd, initLog } from '../utils/logging';
 
 /**
  * This script derives indicators for road segments from underlying polygons.
@@ -51,16 +50,7 @@ const LOG_DIR = path.resolve(__dirname, '../../log/indicator-from-areas');
 const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
 const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
 
-// Store all the logs to write them to a file on exit.
-var logData = [];
-function clog (...args) {
-  logData.push(args.join(' '));
-  console.log(...args);
-}
-// Write logging to file.
-nodeCleanup(function (exitCode, signal) {
-  fs.writeFileSync(`${LOG_DIR}/log-${Date.now()}.txt`, logData.join('\n'));
-});
+const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Loading Road Network');
 const ways = fs.readJsonSync(RN_FILE).features;

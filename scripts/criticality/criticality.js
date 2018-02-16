@@ -3,9 +3,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import Promise from 'bluebird';
 import OSRM from 'osrm';
-import nodeCleanup from 'node-cleanup';
 
-import { tStart, tEnd, jsonToFile } from '../utils/logging';
+import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
 import { runCmd } from '../utils/utils';
 
 // //////////////////////////////////////////////////////////
@@ -22,16 +21,7 @@ const OSRM_FOLDER = path.resolve(OUTPUT_DIR, 'osrm');
 // Number of concurrent operations to run.
 const CONCURR_OPS = 5;
 
-// Store all the logs to write them to a file on exit.
-var logData = [];
-function clog (...args) {
-  logData.push(args.join(' '));
-  console.log(...args);
-}
-// Write logging to file.
-nodeCleanup(function (exitCode, signal) {
-  fs.writeFileSync(`${LOG_DIR}/log-${Date.now()}.txt`, logData.join('\n'));
-});
+const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 const odPairs = fs.readJsonSync(OD_FILE);
 var ways = fs.readJsonSync(WAYS_FILE);
@@ -287,6 +277,7 @@ async function ignoreSegment (way, osrmFolder) {
   tStart(`WAY ${identifier} osm-contract`)();
   await runCmd('docker', [
     'run',
+    '--rm',
     '-t',
     '-v', `${rootPath}:/data`,
     'osrm/osrm-backend:v5.15.0',
