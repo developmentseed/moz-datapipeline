@@ -29,14 +29,16 @@ echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.lis
 apt-get update
 apt-get install -y yarn
 
+# Command line tools
+pip install csvkit
+pip install awscli --upgrade --user
+yarn global add geojson-join
+
 # Tippecanoe
 mkdir -p /tmp/tippecanoe-src
 cd /tmp/tippecanoe-src
 git clone --branch 1.27.6 https://github.com/mapbox/tippecanoe.git /tmp/tippecanoe-src
 make && make install
-
-# AWS cli
-pip install awscli --upgrade --user
 
 ## Housekeeping
 cd /
