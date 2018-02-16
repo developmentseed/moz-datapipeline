@@ -118,6 +118,9 @@ ogr2ogr -overwrite $TMP_DIR/prov_boundaries.shp $TMP_DIR/prov_boundaries.shp \
   -dialect sqlite -sql "SELECT ST_union(Geometry),* FROM prov_boundaries GROUP BY iso_3166_2" \
   -nln prov_boundaries
 
+# Create geoJSON of province boundaries
+ogr2ogr -f "GeoJSON" $TMP_DIR/prov_boundaries.geojson $TMP_DIR/prov_boundaries.shp
+
 
 ###############################################################################
 #
