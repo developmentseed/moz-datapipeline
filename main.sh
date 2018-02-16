@@ -2,7 +2,7 @@ bash ./scripts/preparation.sh
 
 # Add source data for fishery potential to GeoJSON with district boundaries
 csvcut -c ZS_ID,ArtFiMean source/p2Mozambique.csv > .tmp/fisheries.csv
-cat .tmp/district_boundaries.geojson | geojson-join --format=csv \
+cat .tmp/district_boundaries.geojson | ./node_modules/geojson-join/geojson-join --format=csv \
     .tmp/fisheries.csv \
     --againstField=ZS_ID \
     --geojsonField=ZS_ID > .tmp/district_boundaries-fish.geojson

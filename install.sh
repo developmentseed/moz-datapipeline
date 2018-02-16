@@ -32,7 +32,6 @@ apt-get install -y yarn
 # Command line tools
 pip install csvkit
 pip install awscli --upgrade --user
-yarn global add geojson-join
 
 # Tippecanoe
 mkdir -p /tmp/tippecanoe-src

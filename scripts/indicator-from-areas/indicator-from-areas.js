@@ -90,7 +90,7 @@ function prepTree (areas, indProperty) {
         maxY: b[3],
         feat: f
       };
-  }));
+    }));
   clog('Create rbush tree... done');
   return tree;
 }
