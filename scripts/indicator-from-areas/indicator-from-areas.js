@@ -176,7 +176,7 @@ async function run (ways, tree, indProperty) {
     tEnd(`Way ${id} weigh indicator`)();
 
     return {
-      wayId: way.properties.NAME,
+      way_id: way.properties.NAME,
       score: weightedIndicator
     };
   });
