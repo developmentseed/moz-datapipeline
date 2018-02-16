@@ -70,23 +70,26 @@ const areasData = fs.readJsonSync(AREAS_FILE);
 /**
  * Creates rbush tree form the bbox of input features.
  *
- * @param  {Object} areas   Input FeatureCollection
+ * @param  {Object} areas       Input FeatureCollection.
+ * @param  {String} indProperty Property of the indicator
  *
- * @return {Object}         Rbush tree
+ * @return {Object}             Rbush tree.
  */
-function prepTree (areas) {
+function prepTree (areas, indProperty) {
   clog('Create rbush tree');
 
   var tree = rbush();
-  tree.load(areas.features.map(f => {
-    let b = bbox(f);
-    return {
-      minX: b[0],
-      minY: b[1],
-      maxX: b[2],
-      maxY: b[3],
-      feat: f
-    };
+  tree.load(areas.features
+    .filter(f => f.properties[indProperty] > 0)
+    .map(f => {
+      let b = bbox(f);
+      return {
+        minX: b[0],
+        minY: b[1],
+        maxX: b[2],
+        maxY: b[3],
+        feat: f
+      };
   }));
   clog('Create rbush tree... done');
   return tree;
@@ -190,7 +193,7 @@ async function run (ways, tree, indProperty) {
     ]);
 
     tStart(`Total run time`)();
-    const tree = prepTree(areasData);
+    const tree = prepTree(areasData, PROPERTY);
 
     await run(ways, tree, PROPERTY);
     tEnd(`Total run time`)();
