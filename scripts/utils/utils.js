@@ -2,6 +2,8 @@
 import fs from 'fs-extra';
 import Promise from 'bluebird';
 import { spawn } from 'child_process';
+import bbox from '@turf/bbox';
+import rbush from 'rbush';
 
 /**
  * Tap into a promise and run the given function.
@@ -65,4 +67,26 @@ export function runCmd (cmd, args, env = {}, logFile) {
       }
     });
   });
+}
+
+/**
+ * Creates rbush tree form the bbox of input features.
+ *
+ * @param  {Object} fc      Input FeatureCollection
+ *
+ * @return {Object}         Rbush tree
+ */
+export function prepTree (fc) {
+  var tree = rbush();
+  tree.load(fc.features.map(f => {
+    let b = bbox(f);
+    return {
+      minX: b[0],
+      minY: b[1],
+      maxX: b[2],
+      maxY: b[3],
+      feat: f
+    };
+  }));
+  return tree;
 }

@@ -3,14 +3,14 @@ import fs from 'fs-extra';
 import path from 'path';
 import Promise from 'bluebird';
 import nodeCleanup from 'node-cleanup';
+import bbox from '@turf/bbox';
 import lineSplit from '@turf/line-split';
 import pointWithinPolygon from '@turf/points-within-polygon';
-import bbox from '@turf/bbox';
 import { point } from '@turf/helpers';
 import length from '@turf/length';
-import rbush from 'rbush';
 import csvStringify from 'csv-stringify';
 
+import {prepTree} from '../utils/utils';
 import {tStart, tEnd} from '../utils/logging';
 
 /**
@@ -66,31 +66,6 @@ clog('Loading Road Network');
 const ways = fs.readJsonSync(RN_FILE).features;
 clog('Loading Source Data');
 const areasData = fs.readJsonSync(AREAS_FILE);
-
-/**
- * Creates rbush tree form the bbox of input features.
- *
- * @param  {Object} areas   Input FeatureCollection
- *
- * @return {Object}         Rbush tree
- */
-function prepTree (areas) {
-  clog('Create rbush tree');
-
-  var tree = rbush();
-  tree.load(areas.features.map(f => {
-    let b = bbox(f);
-    return {
-      minX: b[0],
-      minY: b[1],
-      maxX: b[2],
-      maxY: b[3],
-      feat: f
-    };
-  }));
-  clog('Create rbush tree... done');
-  return tree;
-}
 
 function dataToCSV (data) {
   return new Promise((resolve, reject) => {
@@ -190,7 +165,10 @@ async function run (ways, tree, indProperty) {
     ]);
 
     tStart(`Total run time`)();
+
+    clog('Create rbush tree');
     const tree = prepTree(areasData);
+    clog('Create rbush tree... done');
 
     await run(ways, tree, PROPERTY);
     tEnd(`Total run time`)();
