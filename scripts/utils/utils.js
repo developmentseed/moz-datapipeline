@@ -72,21 +72,24 @@ export function runCmd (cmd, args, env = {}, logFile) {
 /**
  * Creates rbush tree form the bbox of input features.
  *
- * @param  {Object} fc      Input FeatureCollection
+ * @param  {Object} areas       Input FeatureCollection.
+ * @param  {String} indProperty Property of the indicator
  *
- * @return {Object}         Rbush tree
+ * @return {Object}             Rbush tree.
  */
-export function prepTree (fc) {
+function prepTree (areas, indProperty) {
   var tree = rbush();
-  tree.load(fc.features.map(f => {
-    let b = bbox(f);
-    return {
-      minX: b[0],
-      minY: b[1],
-      maxX: b[2],
-      maxY: b[3],
-      feat: f
-    };
-  }));
+  tree.load(areas.features
+    .filter(f => f.properties[indProperty] > 0)
+    .map(f => {
+      let b = bbox(f);
+      return {
+        minX: b[0],
+        minY: b[1],
+        maxX: b[2],
+        maxY: b[3],
+        feat: f
+      };
+    }));
   return tree;
 }

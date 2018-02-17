@@ -148,7 +148,7 @@ async function run (ways, tree, indProperty) {
     tEnd(`Way ${id} weigh indicator`)();
 
     return {
-      wayId: way.properties.NAME,
+      way_id: way.properties.NAME,
       score: weightedIndicator
     };
   });
@@ -167,7 +167,7 @@ async function run (ways, tree, indProperty) {
     tStart(`Total run time`)();
 
     clog('Create rbush tree');
-    const tree = prepTree(areasData);
+    const tree = prepTree(areasData, PROPERTY);
     clog('Create rbush tree... done');
 
     await run(ways, tree, PROPERTY);
