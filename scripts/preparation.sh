@@ -87,6 +87,11 @@ ogr2ogr -overwrite $TMP_DIR/roadnetwork.shp $TMP_DIR/roadnetwork.shp \
 
 ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp
 
+# Additional properties to be included in the roadnetwork geojson:
+# - Add length to each way
+# - Add ISO code of province the roads belongs to
+node ./scripts/additional-props/index.js
+
 
 ###############################################################################
 #
@@ -138,11 +143,3 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/district_boundaries.geojson $TMP_DIR/district_boun
     ZS_ID, SUBDIST, POV_HCR \
     FROM district_boundaries" \
   -nln district_boundaries
-
-
-###############################################################################
-#
-# 4. Additional properties to be included in the roadnetwork geojson
-#
-
-node ./scripts/additional-props/index.js
