@@ -43,6 +43,7 @@ function checkRequiredFile() {
 checkRequiredFile './source/road-network' '*.shp' RN_FILE
 checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
+checkRequiredFile './source/agriculture' '*.shp' AG_FILE
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
@@ -135,3 +136,15 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/district_boundaries.geojson $TMP_DIR/district_boun
     ZS_ID, SUBDIST, POV_HCR \
     FROM district_boundaries" \
   -nln district_boundaries
+
+
+###############################################################################
+#
+# 5. Prepare agricultural data from the SPAM project (IFPRI)
+#
+
+echo "Preparing SPAM data..."
+
+# Write to temp file. This is a separate command so we know the layer name in subsequent ones
+ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture.geojson "$AG_FILE" \
+  -t_srs "EPSG:4326"
