@@ -15,6 +15,7 @@ services:
         source: ./source
         target: /var/pipeline/source
         read_only: true
+      - /var/run/docker.sock:/var/run/docker.sock
     command: bash ./main.sh
 
 volumes:
