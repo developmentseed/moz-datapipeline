@@ -90,7 +90,7 @@ function attachIndicatorToRN (filePath) {
           return;
         }
 
-        feat.properties[indId] = json.score;
+        feat.properties[indId] = parseFloat(json.score);
         visited.push(json.way_id);
       })
       .on('done', err => {
