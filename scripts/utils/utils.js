@@ -77,7 +77,7 @@ export function runCmd (cmd, args, env = {}, logFile) {
  *
  * @return {Object}             Rbush tree.
  */
-function prepTree (areas, indProperty) {
+export function prepTree (areas, indProperty) {
   var tree = rbush();
   tree.load(areas.features
     .filter(f => f.properties[indProperty] > 0)

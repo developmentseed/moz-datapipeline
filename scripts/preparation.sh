@@ -62,6 +62,7 @@ mkdir $TMP_DIR
 #   - a cleanup of the fields. Only keep:
 #       NAME (String) - unique id of the road segment. Example: R850-T2150
 #       ROAD_NAME (String) - name of the road. Example: Combomune -- Macandze
+#       ROAD_ID (String) - id of the road the segment belongs to. Example: R850
 #       START_LOC (String) - Example: Fr. Mabalane
 #       STA_POINT (String) - Example: Fr. Mabalane
 #       END_LOC (String) - Example: Dindiza
@@ -75,9 +76,6 @@ mkdir $TMP_DIR
 #       AADT (Real) - average annual daily traffic Example: 70.000000
 #   - remove features that have no geometry
 #   - reproject to EPSG:4326
-#   - add additional properties to each road segment:
-#       - length
-#       - ISO code of province the roads belongs to
 #   - store it in GeoJSON format
 
 echo "Prepare road network data..."
@@ -92,9 +90,6 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp \
     FROM roadnetwork \
     WHERE geometry is not null" \
   -nln roadnetwork
-
-# Additional properties to be included in the roadnetwork geojson
-node ./scripts/additional-props/index.js
 
 
 ###############################################################################
@@ -188,3 +183,19 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/district_boundaries.geojson $TMP_DIR/district_boun
   -nln district_boundaries
 
 echo "All done preparing the base data."
+
+
+###############################################################################
+#
+# 5. Add additional properties to each of the road segments:
+#   - bridgeAmount - total number of bridges on segment
+#   - bridgeLength - length of bridges on segment, in meters
+#   - culvertAmount - total number of culverts
+#   - length - length of the road
+#   - provinceIso - ISO code of province the roads belongs to
+#
+
+echo "Add additional properties to road network..."
+
+# Additional properties to be included in the roadnetwork geojson
+node ./scripts/additional-props/index.js
