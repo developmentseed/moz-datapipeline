@@ -1,11 +1,10 @@
 'use strict';
 import fs from 'fs-extra';
 import path from 'path';
-import nodeCleanup from 'node-cleanup';
 import { featureCollection } from '@turf/helpers';
 import pointToLineDistance from '@turf/point-to-line-distance';
 
-import {tStart, tEnd} from '../utils/logging';
+import {tStart, tEnd, initLog} from '../utils/logging';
 
 /**
  * This script checks which way a bridge or culvert belongs to.
@@ -35,20 +34,11 @@ if (!BRIDGE_FILE || !RN_FILE) {
 // Config Vars
 
 const OUTPUT_DIR = path.resolve(__dirname, '../../.tmp');
-const LOG_DIR = path.resolve(__dirname, '../../log/merging-lines');
+const LOG_DIR = path.resolve(__dirname, '../../log/prep-bridge');
 
 const OUTPUT_FILE = path.resolve(OUTPUT_DIR, 'bridges.geojson');
 
-// Store all the logs to write them to a file on exit.
-var logData = [];
-function clog (...args) {
-  logData.push(args.join(' '));
-  console.log(...args);
-}
-// Write logging to file.
-nodeCleanup(function (exitCode, signal) {
-  fs.writeFileSync(`${LOG_DIR}/log-${Date.now()}.txt`, logData.join('\n'));
-});
+const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Loading point data');
 // Load GeoJSON and filter it to point features and clean up the road IDs
