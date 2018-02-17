@@ -146,5 +146,20 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/district_boundaries.geojson $TMP_DIR/district_boun
 echo "Preparing SPAM data..."
 
 # Write to temp file. This is a separate command so we know the layer name in subsequent ones
-ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture.geojson "$AG_FILE" \
+ogr2ogr $TMP_DIR/ag.shp "$AG_FILE" \
   -t_srs "EPSG:4326"
+
+ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture.geojson $TMP_DIR/ag.shp \
+  -sql "SELECT alloc_key, ag_bykm \
+    FROM ag"
+
+# Generate an agriculture shapefile with the polygons centerpoints
+ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture-centroid.geojson $TMP_DIR/ag.shp \
+  -dialect sqlite \
+  -sql "SELECT ST_Centroid(geometry), ag_bykm FROM ag"
+
+# Filter the centroids to the top 20%
+node ./scripts/filter-percentile ./.tmp/agriculture-centerpoints.geojson ./.tmp/agriculture-potential.geojson ag_bykm 80
+
+rm $TMP_DIR/agriculture-centerpoints.geojson
+rm $TMP_DIR/ag.*

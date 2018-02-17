@@ -12,6 +12,9 @@ cat $TMP_DIR/district_boundaries.geojson | ./node_modules/geojson-join/geojson-j
 # Calculate fishery potential for each road segment
 node ./scripts/indicator-from-areas/index.js .tmp/district_boundaries-fish.geojson ArtFiMean fish-potential
 
+# Calculate agriculture potential for each road segment
+node ./scripts/indicator-from-areas/index.js .tmp/agriculture.geojson ag_bykm agriculture-potential
+
 # Calculate agriculture production for each road segment
 # Add source data for agriculture production to GeoJSON with areas from SPAM
 cat $TMP_DIR/agriculture.geojson | ./node_modules/geojson-join/geojson-join --format=csv \
