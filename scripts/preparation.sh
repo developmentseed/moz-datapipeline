@@ -72,6 +72,9 @@ mkdir $TMP_DIR
 #       AADT (Real) - average annual daily traffic Example: 70.000000
 #   - remove features that have no geometry
 #   - reproject to EPSG:4326
+#   - add additional properties to each road segment:
+#       - length
+#       - ISO code of province the roads belongs to
 #   - store it in Shapefile and GeoJSON format
 
 # Write to temp file. This is a separate command so we know the layer name in subsequent ones
@@ -87,9 +90,7 @@ ogr2ogr -overwrite $TMP_DIR/roadnetwork.shp $TMP_DIR/roadnetwork.shp \
 
 ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp
 
-# Additional properties to be included in the roadnetwork geojson:
-# - Add length to each way
-# - Add ISO code of province the roads belongs to
+# Additional properties to be included in the roadnetwork geojson
 node ./scripts/additional-props/index.js
 
 
