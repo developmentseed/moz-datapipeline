@@ -9,6 +9,9 @@ services:
         source: ./output
         target: /var/pipeline/output
       - type: bind
+        source: ./.tmp
+        target: /var/pipeline/.tmp
+      - type: bind
         source: ./source
         target: /var/pipeline/source
         read_only: true
@@ -17,3 +20,4 @@ services:
 volumes:
   output:
   source:
+  .tmp:

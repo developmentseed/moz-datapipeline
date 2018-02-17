@@ -44,7 +44,7 @@ if (!AREAS_FILE || !PROPERTY || !IND_NAME) {
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
+const OUTPUT_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/indicator-from-areas');
 
 const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
