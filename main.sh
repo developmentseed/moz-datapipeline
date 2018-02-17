@@ -13,4 +13,7 @@ node ./scripts/indicator-from-areas/index.js .tmp/district_boundaries-fish.geojs
 # Calculate poverty rate for each road segment
 node ./scripts/indicator-from-areas/index.js .tmp/district_boundaries.geojson POV_HCR poverty
 
-# bash ./scripts/wrapup.sh
+# Attach indicators to RN
+node ./scripts/merge-indicators/index.js
+
+bash ./scripts/wrapup.sh

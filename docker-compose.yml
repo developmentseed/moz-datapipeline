@@ -9,11 +9,16 @@ services:
         source: ./output
         target: /var/pipeline/output
       - type: bind
+        source: ./.tmp
+        target: /var/pipeline/.tmp
+      - type: bind
         source: ./source
         target: /var/pipeline/source
         read_only: true
+      - /var/run/docker.sock:/var/run/docker.sock
     command: bash ./main.sh
 
 volumes:
   output:
   source:
+  .tmp:
