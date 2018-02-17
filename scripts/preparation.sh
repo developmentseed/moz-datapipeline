@@ -78,7 +78,7 @@ mkdir $TMP_DIR
 #   - add additional properties to each road segment:
 #       - length
 #       - ISO code of province the roads belongs to
-#   - store it in Shapefile and GeoJSON format
+#   - store it in GeoJSON format
 
 echo "Prepare road network data..."
 
@@ -86,14 +86,12 @@ echo "Prepare road network data..."
 ogr2ogr $TMP_DIR/roadnetwork.shp "$RN_FILE" \
   -t_srs "EPSG:4326"
 
-ogr2ogr -overwrite $TMP_DIR/roadnetwork.shp $TMP_DIR/roadnetwork.shp \
+ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp \
   -dialect sqlite \
   -sql "SELECT NAME, ROAD_NAME, ROAD_ID, START_LOC, STA_POINT, END_LOC, END_POINT, ROAD_CLASS, SURF_TYPE, PAVE_WIDTH, AVG_COND, DISTRICT, PROVINCE, AADT, geometry \
     FROM roadnetwork \
     WHERE geometry is not null" \
   -nln roadnetwork
-
-ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp
 
 # Additional properties to be included in the roadnetwork geojson
 node ./scripts/additional-props/index.js
