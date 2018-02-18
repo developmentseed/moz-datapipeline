@@ -2,7 +2,6 @@
 import fs from 'fs-extra';
 import path from 'path';
 import Promise from 'bluebird';
-import nodeCleanup from 'node-cleanup';
 import lineSplit from '@turf/line-split';
 import pointWithinPolygon from '@turf/points-within-polygon';
 import bbox from '@turf/bbox';
@@ -11,7 +10,7 @@ import length from '@turf/length';
 import rbush from 'rbush';
 import csvStringify from 'csv-stringify';
 
-import {tStart, tEnd} from '../utils/logging';
+import { tStart, tEnd, initLog } from '../utils/logging';
 
 /**
  * This script derives indicators for road segments from underlying polygons.
@@ -45,22 +44,13 @@ if (!AREAS_FILE || !PROPERTY || !IND_NAME) {
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
+const OUTPUT_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/indicator-from-areas');
 
 const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
 const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
 
-// Store all the logs to write them to a file on exit.
-var logData = [];
-function clog (...args) {
-  logData.push(args.join(' '));
-  console.log(...args);
-}
-// Write logging to file.
-nodeCleanup(function (exitCode, signal) {
-  fs.writeFileSync(`${LOG_DIR}/log-${Date.now()}.txt`, logData.join('\n'));
-});
+const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Loading Road Network');
 const ways = fs.readJsonSync(RN_FILE).features;
@@ -70,24 +60,27 @@ const areasData = fs.readJsonSync(AREAS_FILE);
 /**
  * Creates rbush tree form the bbox of input features.
  *
- * @param  {Object} areas   Input FeatureCollection
+ * @param  {Object} areas       Input FeatureCollection.
+ * @param  {String} indProperty Property of the indicator
  *
- * @return {Object}         Rbush tree
+ * @return {Object}             Rbush tree.
  */
-function prepTree (areas) {
+function prepTree (areas, indProperty) {
   clog('Create rbush tree');
 
   var tree = rbush();
-  tree.load(areas.features.map(f => {
-    let b = bbox(f);
-    return {
-      minX: b[0],
-      minY: b[1],
-      maxX: b[2],
-      maxY: b[3],
-      feat: f
-    };
-  }));
+  tree.load(areas.features
+    .filter(f => f.properties[indProperty] > 0)
+    .map(f => {
+      let b = bbox(f);
+      return {
+        minX: b[0],
+        minY: b[1],
+        maxX: b[2],
+        maxY: b[3],
+        feat: f
+      };
+    }));
   clog('Create rbush tree... done');
   return tree;
 }
@@ -173,7 +166,7 @@ async function run (ways, tree, indProperty) {
     tEnd(`Way ${id} weigh indicator`)();
 
     return {
-      wayId: way.properties.NAME,
+      way_id: way.properties.NAME,
       score: weightedIndicator
     };
   });
@@ -190,7 +183,7 @@ async function run (ways, tree, indProperty) {
     ]);
 
     tStart(`Total run time`)();
-    const tree = prepTree(areasData);
+    const tree = prepTree(areasData, PROPERTY);
 
     await run(ways, tree, PROPERTY);
     tEnd(`Total run time`)();
