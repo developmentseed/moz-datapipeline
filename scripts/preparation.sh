@@ -39,8 +39,11 @@ function checkRequiredFile() {
 #
 # 0. Basic housekeeping
 
+echo 'Basic housekeeping...'
+
 # Check for required files and directories
 checkRequiredFile './source/road-network' '*.shp' RN_FILE
+checkRequiredFile './source/bridges' '*.shp' BRIDGE_FILE
 checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
 
@@ -59,6 +62,7 @@ mkdir $TMP_DIR
 #   - a cleanup of the fields. Only keep:
 #       NAME (String) - unique id of the road segment. Example: R850-T2150
 #       ROAD_NAME (String) - name of the road. Example: Combomune -- Macandze
+#       ROAD_ID (String) - id of the road the segment belongs to. Example: R850
 #       START_LOC (String) - Example: Fr. Mabalane
 #       STA_POINT (String) - Example: Fr. Mabalane
 #       END_LOC (String) - Example: Dindiza
@@ -72,33 +76,64 @@ mkdir $TMP_DIR
 #       AADT (Real) - average annual daily traffic Example: 70.000000
 #   - remove features that have no geometry
 #   - reproject to EPSG:4326
-#   - add additional properties to each road segment:
-#       - length
-#       - ISO code of province the roads belongs to
-#   - store it in Shapefile and GeoJSON format
+#   - store it in GeoJSON format
+
+echo "Prepare road network data..."
 
 # Write to temp file. This is a separate command so we know the layer name in subsequent ones
 ogr2ogr $TMP_DIR/roadnetwork.shp "$RN_FILE" \
   -t_srs "EPSG:4326"
 
-ogr2ogr -overwrite $TMP_DIR/roadnetwork.shp $TMP_DIR/roadnetwork.shp \
+ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp \
   -dialect sqlite \
-  -sql "SELECT NAME, ROAD_NAME, START_LOC, STA_POINT, END_LOC, END_POINT, ROAD_CLASS, SURF_TYPE, PAVE_WIDTH, AVG_COND, DISTRICT, PROVINCE, AADT, geometry \
+  -sql "SELECT NAME, ROAD_NAME, ROAD_ID, START_LOC, STA_POINT, END_LOC, END_POINT, ROAD_CLASS, SURF_TYPE, PAVE_WIDTH, AVG_COND, DISTRICT, PROVINCE, AADT, geometry \
     FROM roadnetwork \
     WHERE geometry is not null" \
   -nln roadnetwork
 
-ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp
 
-# Additional properties to be included in the roadnetwork geojson
-node ./scripts/additional-props/index.js
+###############################################################################
+#
+# 2. Generate base bridge and culvert data
+#
+# Ingest the Bridge shapefile and:
+#   - perform a cleanup of the fields. Only keep:
+#       Over_Lengt (Number) - length of the bridge. Example: 21.0
+#       Num_Spans (Number) - Example: 10
+#       Road_ID (String) - ID of the road the bridge/culvert is part of. Example: R0529
+#       Mat_Type (String) - material type Example: STEL
+#       Str_Desc (String) - Example: Bailey Bridge
+#   - add/update the following properties:
+#     - add ID of the closest road
+#     - add a type (bridge / culvert) based on the name
+#     - add length of 7 in case there is no data on length
+#   - reproject to EPSG:4326
+#   - store it in GeoJSON format
+
+echo "Prepare bridge data..."
+
+ogr2ogr $TMP_DIR/_bridges.shp "$BRIDGE_FILE" \
+  -t_srs "EPSG:4326"
+
+ogr2ogr -f "GeoJSON" $TMP_DIR/bridges.geojson $TMP_DIR/_bridges.shp \
+  -dialect sqlite \
+  -sql "SELECT Over_Lengt, Road_ID, Num_Spans, Clear_Soff, Clear_Widt, Mat_Type, Str_Desc, geometry \
+    FROM _bridges" \
+  -nln _bridges
+
+node ./scripts/prep-bridge .tmp/bridges.geojson .tmp/roadnetwork.geojson
+
+# clean up the intermediate shapefiles
+rm $TMP_DIR/_bridges*
 
 
 ###############################################################################
 #
-# 2. Generate base boundary data for the provinces. This will mostly be used
+# 3. Generate base boundary data for the provinces. This will mostly be used
 # in the frontend for display.
 #
+
+echo "Prepare base boundary data for the provinces..."
 
 # Write to temp file. This is a separate command so we know the layer name in subsequent ones
 ogr2ogr $TMP_DIR/prov_boundaries.shp "$PROVINCE_FILE" \
@@ -130,9 +165,11 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/prov_boundaries.geojson $TMP_DIR/prov_boundaries.s
 
 ###############################################################################
 #
-# 3. Generate base boundary data for the districts. This will mostly be used
+# 4. Generate base boundary data for the districts. This will mostly be used
 # to generate the indicators on district level.
 #
+
+echo "Prepare base boundary data for the districts..."
 
 # Write to temp file. This is a separate command so we know the layer name in subsequent ones
 ogr2ogr $TMP_DIR/district_boundaries.shp "$DISTRICT_FILE" \
@@ -144,3 +181,21 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/district_boundaries.geojson $TMP_DIR/district_boun
     ZS_ID, SUBDIST, POV_HCR \
     FROM district_boundaries" \
   -nln district_boundaries
+
+echo "All done preparing the base data."
+
+
+###############################################################################
+#
+# 5. Add additional properties to each of the road segments:
+#   - bridgeAmount - total number of bridges on segment
+#   - bridgeLength - length of bridges on segment, in meters
+#   - culvertAmount - total number of culverts
+#   - length - length of the road
+#   - provinceIso - ISO code of province the roads belongs to
+#
+
+echo "Add additional properties to road network..."
+
+# Additional properties to be included in the roadnetwork geojson
+node ./scripts/additional-props/index.js .tmp/
