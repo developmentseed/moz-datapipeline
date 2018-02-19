@@ -1,3 +1,6 @@
 rasterio
 rasterstats
 pyproj
+csvkit
+awscli
+boto3
