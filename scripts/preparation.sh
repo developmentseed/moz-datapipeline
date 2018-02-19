@@ -198,4 +198,4 @@ echo "All done preparing the base data."
 echo "Add additional properties to road network..."
 
 # Additional properties to be included in the roadnetwork geojson
-node ./scripts/additional-props/index.js
+node ./scripts/additional-props/index.js .tmp/

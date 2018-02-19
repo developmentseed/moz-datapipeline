@@ -14,6 +14,6 @@ node ./scripts/indicator-from-areas/index.js .tmp/district_boundaries-fish.geojs
 node ./scripts/indicator-from-areas/index.js .tmp/district_boundaries.geojson POV_HCR poverty
 
 # Attach indicators to RN
-node ./scripts/merge-indicators/index.js
+node ./scripts/merge-indicators/index.js .tmp/
 
 bash ./scripts/wrapup.sh
