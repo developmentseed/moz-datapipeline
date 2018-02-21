@@ -30,6 +30,6 @@ fi
 # Delete destination if it exists
 rm -rf $OUTPUT_DIR/roadnetwork-tiles
 
-tippecanoe -e $OUTPUT_DIR/roadnetwork-tiles -l roads $OUTPUT_DIR/roadnetwork-indicators.geojson
+tippecanoe -e $OUTPUT_DIR/roadnetwork-tiles -z 13 -l roads $OUTPUT_DIR/roadnetwork-indicators.geojson
 
 aws s3 sync $OUTPUT_DIR/roadnetwork-tiles/ s3://$AWS_BUCKET/ --delete --content-encoding gzip --acl public-read
