@@ -1,5 +1,9 @@
 # Criticality
 
+Requirements:
+- output/roadnetwork.shp
+- output/roadnetwork.geojson
+
 # Road network in OSM XML format (from root folder)
 ```
 python libs/ogr2osm/ogr2osm.py output/roadnetwork.shp --split-ways 1 -t libs/ogr2osm/default_translation.py -o output/roadnetwork.osm -f
@@ -7,6 +11,7 @@ python libs/ogr2osm/ogr2osm.py output/roadnetwork.shp --split-ways 1 -t libs/ogr
 
 ## Highway tag and ids (temp)
 All ways need a highway tag and a positive id.
+TODO: Highway tag no longer needed with new profile file.
 ```
 sed -ie 's/id="-/id="/g' output/roadnetwork.osm
 sed -ie 's/ref="-/ref="/g' output/roadnetwork.osm
@@ -15,7 +20,7 @@ sed -ie 's/<\/way>/<tag k="highway" v="primary" \/><\/way>/g' output/roadnetwork
 
 # Create ways list
 ```
-node extract-ways.js
+node scripts/criticality/extract-ways.js
 ```
 
 # OD pairs
@@ -25,9 +30,9 @@ Convert to geojson `ogr2ogr -f "GeoJSON" output/od.geojson OD_all_MZ_v1.shp
 # OSRM
 ```
 mkdir output/osrm
-docker run -t -v $(pwd):/data osrm/osrm-backend:v5.15.0 osrm-extract -p /data/libs/car.lua /data/output/roadnetwork.osm
-docker run -t -v $(pwd):/data osrm/osrm-backend:v5.15.0 osrm-contract /data/roadnetwork.osrm
-mv roadnetwork.osrm* output/osrm
+docker run -t -v $(pwd):/data osrm/osrm-backend:v5.15.0 osrm-extract -p /data/scripts/criticality/moz.lua /data/output/roadnetwork.osm
+docker run -t -v $(pwd):/data osrm/osrm-backend:v5.15.0 osrm-contract /data/output/roadnetwork.osrm
+mv output/roadnetwork.osrm* output/osrm
 ```
 
 ------
