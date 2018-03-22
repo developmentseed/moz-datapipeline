@@ -13,7 +13,7 @@ const through = require('through2');
 
 const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 
-const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
+const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.osm');
 const OUTPUT_WAYS = path.resolve(OUTPUT_DIR, 'roadnetwork-osm-ways.json');
 
 const rnFile = fs.createReadStream(RN_FILE);

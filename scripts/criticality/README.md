@@ -2,7 +2,6 @@
 
 Requirements:
 - output/roadnetwork.shp
-- output/roadnetwork.geojson
 
 # Road network in OSM XML format (from root folder)
 ```
