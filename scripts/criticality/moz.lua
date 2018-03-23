@@ -27,6 +27,7 @@
 -- Additional information about `.lua` profiles:
 -- - https://www.winwaed.com/blog/2015/11/18/osrms-lua-scripts/
 -- - https://github.com/Project-OSRM/osrm-backend/wiki/Profiles
+-- - https://github.com/Project-OSRM/osrm-backend/blob/master/docs/profiles.md
 
 api_version = 4
 
