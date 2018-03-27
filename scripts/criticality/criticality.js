@@ -5,7 +5,7 @@ import Promise from 'bluebird';
 import OSRM from 'osrm';
 
 import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
-import { runCmd } from '../utils/utils';
+import { runCmd, dataToCSV } from '../utils/utils';
 
 // //////////////////////////////////////////////////////////
 // Config Vars
@@ -17,6 +17,9 @@ const LOG_DIR = path.resolve(__dirname, '../../log/criticality');
 const OD_FILE = path.resolve(OUTPUT_DIR, 'od.geojson');
 const WAYS_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork-osm-ways.json');
 const OSRM_FOLDER = path.resolve(OUTPUT_DIR, 'osrm');
+
+const IND_NAME = 'criticality';
+const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
 
 // Number of concurrent operations to run.
 const CONCURR_OPS = 5;
@@ -73,7 +76,35 @@ async function run (ways, odPairs) {
   clog('changes', result.filter(o => o.time > 0));
   clog('data length', result.length);
 
-  return jsonToFile(`${LOG_DIR}/criticality.json`)(result);
+  // Calculate score (0 - 100)
+  // maxtime: normalize values taking into account affected and unroutable pairs.
+  // maxUnroutable: self describing.
+  // Use same reduce to avoid additional loops.
+  const { avgMaxTime, maxUnroutable } = result.reduce((acc, o) => ({
+    avgMaxTime: Math.max(acc.avgMaxTime, (o.unroutablePairs + o.impactedPairs) * o.avgTimeNonZero),
+    maxUnroutable: Math.max(acc.maxUnroutable, o.unroutablePairs)
+  }), { avgMaxTime: 0, maxUnroutable: 0 });
+
+  const scoredRes = result.map(segment => {
+    const timeScore = ((segment.unroutablePairs + segment.impactedPairs) * segment.avgTimeNonZero) / avgMaxTime;
+    const unroutableScore = segment.unroutablePairs / maxUnroutable;
+
+    // Time is 40%, unroutable is 60%.
+    // Then normalize to 0 - 100 scale.
+    segment.score = (timeScore * 0.4 + unroutableScore * 0.6) * 100;
+
+    return segment;
+  });
+
+  await jsonToFile(`${LOG_DIR}/criticality.json`)(scoredRes);
+
+  const waysScore = scoredRes.map(o => ({
+    way_id: o.name,
+    score: o.score
+  }));
+
+  const csv = await dataToCSV(waysScore);
+  return fs.writeFile(OUTPUT_INDICATOR_FILE, csv);
 }
 
 /**
@@ -242,6 +273,8 @@ async function calcTimePenaltyForWay (way, coords, benchmark) {
     wayId: way.id,
     name: way.tags.NAME,
     maxTime: Math.max(...timeDeltas),
+    avgTime: timeDeltas.reduce((a, b) => a + b) / timeDeltas.length,
+    avgTimeNonZero: (timeDeltas.reduce((a, b) => a + b) / timeDeltas.reduce((acc, o) => acc + Number(!!o), 0)) || 0,
     unroutablePairs,
     impactedPairs
   };
