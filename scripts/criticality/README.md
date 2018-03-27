@@ -10,11 +10,9 @@ python libs/ogr2osm/ogr2osm.py output/roadnetwork.shp --split-ways 1 -t libs/ogr
 
 ## Highway tag and ids (temp)
 All ways need a highway tag and a positive id.
-TODO: Highway tag no longer needed with new profile file.
 ```
 sed -ie 's/id="-/id="/g' output/roadnetwork.osm
 sed -ie 's/ref="-/ref="/g' output/roadnetwork.osm
-sed -ie 's/<\/way>/<tag k="highway" v="primary" \/><\/way>/g' output/roadnetwork.osm
 ```
 
 # Create ways list
@@ -29,8 +27,8 @@ Convert to geojson `ogr2ogr -f "GeoJSON" output/od.geojson OD_all_MZ_v1.shp
 # OSRM
 ```
 mkdir output/osrm
-docker run -t -v $(pwd):/data osrm/osrm-backend:v5.15.0 osrm-extract -p /data/scripts/criticality/moz.lua /data/output/roadnetwork.osm
-docker run -t -v $(pwd):/data osrm/osrm-backend:v5.15.0 osrm-contract /data/output/roadnetwork.osrm
+docker run -t -v $(pwd):/data osrm/osrm-backend:v5.16.4 osrm-extract -p /data/scripts/criticality/moz.lua /data/output/roadnetwork.osm
+docker run -t -v $(pwd):/data osrm/osrm-backend:v5.16.4 osrm-contract /data/output/roadnetwork.osrm
 mv output/roadnetwork.osrm* output/osrm
 ```
 
