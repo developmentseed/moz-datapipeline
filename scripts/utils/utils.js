@@ -4,6 +4,7 @@ import Promise from 'bluebird';
 import { spawn } from 'child_process';
 import bbox from '@turf/bbox';
 import rbush from 'rbush';
+import csvStringify from 'csv-stringify';
 
 /**
  * Tap into a promise and run the given function.
@@ -92,4 +93,20 @@ export function prepTree (areas, indProperty) {
       };
     }));
   return tree;
+}
+
+/**
+ * Converts given object to csv.
+ *
+ * @param  {Object} data       Data to convert to csv. Keys will be used
+ *                             as headers.
+ * @return {Promise}           Csv data stringified.
+ */
+export function dataToCSV (data) {
+  return new Promise((resolve, reject) => {
+    csvStringify(data, {header: true}, (err, output) => {
+      if (err) return reject(err);
+      return resolve(output);
+    });
+  });
 }
