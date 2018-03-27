@@ -280,7 +280,7 @@ async function ignoreSegment (way, osrmFolder) {
     '--rm',
     '-t',
     '-v', `${rootPath}:/data`,
-    'osrm/osrm-backend:v5.15.0',
+    'osrm/osrm-backend:v5.16.4',
     'osrm-contract',
     '--segment-speed-file', `/data/${relativeSpeedProf}`,
     `/data/${relativeOSRM}/roadnetwork.osrm`
