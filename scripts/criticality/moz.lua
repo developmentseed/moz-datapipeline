@@ -83,6 +83,7 @@ function process_way (profile, way, result)
   local road_class = way:get_value_by_key('ROAD_CLASS')
   local surf_type = way:get_value_by_key('SURF_TYPE')
   local condition = way:get_value_by_key('AVG_COND')
+  local ruc = way:get_value_by_key('RUC')
 
   -- perform an quick initial check and abort if the way is
   -- obviously not routable. The road must have a class
@@ -101,20 +102,28 @@ function process_way (profile, way, result)
   result.backward_mode = mode.driving
 
   -- Speeds --
-  if road_class and profile.class_speeds[road_class] then
-    result.forward_speed = get_min_above_zero(result.forward_speed, profile.class_speeds[road_class])
-    result.backward_speed = get_min_above_zero(result.backward_speed, profile.class_speeds[road_class])
-  end
+  -- if road_class and profile.class_speeds[road_class] then
+  --   result.forward_speed = get_min_above_zero(result.forward_speed, profile.class_speeds[road_class])
+  --   result.backward_speed = get_min_above_zero(result.backward_speed, profile.class_speeds[road_class])
+  -- end
 
-  if surf_type and profile.surface_speeds[surf_type] then
-    result.forward_speed = get_min_above_zero(result.forward_speed, profile.surface_speeds[surf_type])
-    result.backward_speed = get_min_above_zero(result.backward_speed, profile.surface_speeds[surf_type])
-  end
+  -- if surf_type and profile.surface_speeds[surf_type] then
+  --   result.forward_speed = get_min_above_zero(result.forward_speed, profile.surface_speeds[surf_type])
+  --   result.backward_speed = get_min_above_zero(result.backward_speed, profile.surface_speeds[surf_type])
+  -- end
 
-  if condition and profile.condition_speeds[condition] then
-    result.forward_speed = get_min_above_zero(result.forward_speed, profile.condition_speeds[condition])
-    result.backward_speed = get_min_above_zero(result.backward_speed, profile.condition_speeds[condition])
-  end
+  -- if condition and profile.condition_speeds[condition] then
+  --   result.forward_speed = get_min_above_zero(result.forward_speed, profile.condition_speeds[condition])
+  --   result.backward_speed = get_min_above_zero(result.backward_speed, profile.condition_speeds[condition])
+  -- end
+
+  -- In this case we don't care about the routing time.
+  -- We just need the routing engine to pick the best route given the RUC.
+  -- Set the speed such as the lower the RUC the better.
+
+  result.forward_speed = 100 - ruc * 100
+  result.backward_speed = 100 - ruc * 100
+
 end
 
 function process_turn (profile, turn)
