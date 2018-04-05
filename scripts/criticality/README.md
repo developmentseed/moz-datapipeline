@@ -5,14 +5,7 @@ Requirements:
 
 # Road network in OSM XML format (from root folder)
 ```
-python libs/ogr2osm/ogr2osm.py output/roadnetwork.shp --split-ways 1 -t libs/ogr2osm/default_translation.py -o output/roadnetwork.osm -f
-```
-
-## Highway tag and ids (temp)
-All ways need a positive id.
-```
-sed -ie 's/id="-/id="/g' output/roadnetwork.osm
-sed -ie 's/ref="-/ref="/g' output/roadnetwork.osm
+python libs/ogr2osm/ogr2osm.py output/roadnetwork.shp --split-ways 1 -t libs/ogr2osm/default_translation.py -o output/roadnetwork.osm -f --positive-id
 ```
 
 # Create ways list
