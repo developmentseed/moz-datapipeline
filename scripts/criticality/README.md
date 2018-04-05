@@ -9,7 +9,7 @@ python libs/ogr2osm/ogr2osm.py output/roadnetwork.shp --split-ways 1 -t libs/ogr
 ```
 
 ## Highway tag and ids (temp)
-All ways need a highway tag and a positive id.
+All ways need a positive id.
 ```
 sed -ie 's/id="-/id="/g' output/roadnetwork.osm
 sed -ie 's/ref="-/ref="/g' output/roadnetwork.osm
