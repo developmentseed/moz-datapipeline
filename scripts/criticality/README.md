@@ -2,6 +2,9 @@
 
 Requirements:
 - output/roadnetwork.shp
+- output/od.geojson
+
+To generate these files, run the `main.sh` script.
 
 # Road network in OSM XML format (from root folder)
 ```
@@ -13,10 +16,6 @@ python libs/ogr2osm/ogr2osm.py output/roadnetwork.shp --split-ways 1 -t libs/ogr
 node scripts/criticality/extract-ways.js
 ```
 
-# OD pairs
-Get the source data `OD_all_MZ_v1.shp`
-Convert to geojson `ogr2ogr -f "GeoJSON" output/od.geojson OD_all_MZ_v1.shp
-
 # OSRM
 ```
 mkdir output/osrm
@@ -24,8 +23,6 @@ docker run -t -v $(pwd):/data osrm/osrm-backend:v5.16.4 osrm-extract -p /data/sc
 docker run -t -v $(pwd):/data osrm/osrm-backend:v5.16.4 osrm-contract /data/output/roadnetwork.osrm
 mv output/roadnetwork.osrm* output/osrm
 ```
-
-------
 
 # Run
 ```
