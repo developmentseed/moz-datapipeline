@@ -7,10 +7,37 @@ import OSRM from 'osrm';
 import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
 import { runCmd, dataToCSV } from '../utils/utils';
 
+/**
+ * Performs the criticality analysis outputting the indicator score.
+ *
+ * Usage:
+ *  $node ./scripts/criticality [source-dir]
+ *
+ */
+
+// This script requires 1 parameters.
+const [, , OUTPUT_DIR] = process.argv;
+const { ROOT_DIR } = process.env;
+
+if (!OUTPUT_DIR) {
+  console.log(`This script requires one parameters to run:
+  1. Directory where the source files are.
+
+  Required files:
+  - od.geojson
+  - roadnetwork-osm-ways.json
+  - osrm/
+
+  The resulting ways index will be saves as indicator-criticality.csv.
+  
+  Eg. $node ./scripts/criticality .tmp/`);
+
+  process.exit(1);
+}
+
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 const TMP_DIR = path.resolve(__dirname, '../../.tmp/criticality');
 const LOG_DIR = path.resolve(__dirname, '../../log/criticality');
 
@@ -91,7 +118,7 @@ async function run (ways, odPairs) {
 
     // Time is 40%, unroutable is 60%.
     // Then normalize to 0 - 100 scale.
-    segment.score = (timeScore * 0.4 + unroutableScore * 0.6) * 100;
+    segment.score = ((timeScore || 0) * 0.4 + (unroutableScore || 0) * 0.6) * 100;
 
     return segment;
   });
@@ -298,10 +325,13 @@ async function ignoreSegment (way, osrmFolder) {
   const identifier = way.id;
   const speedProfileFile = `${TMP_DIR}/speed-${identifier}.csv`;
   const rootPath = path.resolve(__dirname, '../..');
+  // The dockerVolMount depends on whether we're running this from another docker
+  // container or directly. See docker-compose.yml for an explanantion.
+  const dockerVolMount = ROOT_DIR || rootPath;
 
-  // Path relative to ../.. for docker
-  const relativeOSRM = path.relative(rootPath, osrmFolder);
-  const relativeSpeedProf = path.relative(rootPath, speedProfileFile);
+  // Paths for the files depending from where this is being run.
+  const pathOSRM = ROOT_DIR ? osrmFolder.replace(rootPath, ROOT_DIR) : osrmFolder;
+  const pathSpeedProf = ROOT_DIR ? speedProfileFile.replace(rootPath, ROOT_DIR) : speedProfileFile;
 
   tStart(`WAY ${identifier} traffic profile`)();
   await createSpeedProfile(speedProfileFile, way);
@@ -312,11 +342,11 @@ async function ignoreSegment (way, osrmFolder) {
     'run',
     '--rm',
     '-t',
-    '-v', `${rootPath}:/data`,
+    '-v', `${dockerVolMount}:${dockerVolMount}`,
     'osrm/osrm-backend:v5.16.4',
     'osrm-contract',
-    '--segment-speed-file', `/data/${relativeSpeedProf}`,
-    `/data/${relativeOSRM}/roadnetwork.osrm`
+    '--segment-speed-file', pathSpeedProf,
+    `${pathOSRM}/roadnetwork.osrm`
   ], {}, `${LOG_DIR}/osm-contract-logs/way-${way.id}.log`);
   tEnd(`WAY ${identifier} osm-contract`)();
 }
@@ -368,5 +398,6 @@ function createSpeedProfile (speedProfileFile, way) {
     tEnd(`Total run time`)();
   } catch (e) {
     console.log(e);
+    process.exit(1);
   }
 }());

@@ -6,14 +6,14 @@ Requirements:
 
 To generate these files, run the `main.sh` script.
 
-# Road network in OSM XML format (from root folder)
+# Road network in OSM XML format (run from root folder)
 ```
 python libs/ogr2osm/ogr2osm.py output/roadnetwork.shp --split-ways 1 -t libs/ogr2osm/default_translation.py -o output/roadnetwork.osm -f --positive-id
 ```
 
 # Create ways list
 ```
-node scripts/criticality/extract-ways.js
+node scripts/criticality/extract-ways.js output/
 ```
 
 # OSRM
@@ -26,7 +26,7 @@ mv output/roadnetwork.osrm* output/osrm
 
 # Run
 ```
-node scripts/criticality
+node scripts/criticality output/
 ```
 
 Use `--max_old_space_size=4096` in case there are memory problems
