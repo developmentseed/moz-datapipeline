@@ -46,6 +46,7 @@ checkRequiredFile './source/road-network' '*.shp' RN_FILE
 checkRequiredFile './source/bridges' '*.shp' BRIDGE_FILE
 checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
+checkRequiredFile './source/od-pairs' '*.shp' OD_FILE
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
@@ -188,7 +189,19 @@ echo "All done preparing the base data."
 
 ###############################################################################
 #
-# 5. Add additional properties to each of the road segments:
+# 5. Generate OD pair data
+#
+
+echo "Preparing OD data..."
+
+ogr2ogr -f "GeoJSON" $TMP_DIR/od.geojson $OD_FILE
+
+echo "All done preparing the OD data."
+
+
+###############################################################################
+#
+# 6. Add additional properties to each of the road segments:
 #   - bridgeAmount - total number of bridges on segment
 #   - bridgeLength - length of bridges on segment, in meters
 #   - culvertAmount - total number of culverts
