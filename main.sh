@@ -13,7 +13,7 @@ cat $TMP_DIR/district_boundaries.geojson | ./node_modules/geojson-join/geojson-j
 node ./scripts/indicator-from-areas/index.js .tmp/district_boundaries-fish.geojson ArtFiMean fish-potential
 
 # Calculate agriculture potential for each road segment
-node ./scripts/indicator-from-areas/index.js .tmp/agriculture.geojson ag_bykm agriculture-potential
+node ./scripts/indicator-from-areas/index.js .tmp/agriculture.geojson ag_bykm ag-potential
 
 # Calculate agriculture production for each road segment
 # Add source data for agriculture production to GeoJSON with areas from SPAM
@@ -21,12 +21,15 @@ cat $TMP_DIR/agriculture.geojson | ./node_modules/geojson-join/geojson-join --fo
     ./source/agriculture/v_all.csv \
     --againstField=ALLOC_KEY \
     --geojsonField=alloc_key > $TMP_DIR/agriculture-production.geojson
-node ./scripts/indicator-from-areas/index.js .tmp/agriculture-production.geojson v_all agriculture-production
+node ./scripts/indicator-from-areas/index.js .tmp/agriculture-production.geojson v_all ag-production
 
 # Calculate poverty rate for each road segment
 node ./scripts/indicator-from-areas/index.js .tmp/district_boundaries.geojson POV_HCR poverty
 
-# Calculate script
+# Add normalized AADT score for each segment
+node ./scripts/indicator-from-prop/index.js AADT
+
+# Calculate link criticality
 bash scripts/criticality/criticality.sh
 
 # Attach indicators to RN

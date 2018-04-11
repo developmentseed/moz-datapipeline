@@ -1,14 +1,14 @@
 'use strict';
 import fs from 'fs-extra';
 import path from 'path';
-import {featureCollection} from '@turf/helpers';
+import { featureCollection } from '@turf/helpers';
 
 import nodeCleanup from 'node-cleanup';
 
-import {tStart, tEnd, jsonToFile} from '../utils/logging';
+import { tStart, tEnd } from '../utils/logging';
 
 /**
- * This script filters GeoJSON features by one of the properties and returns 
+ * This script filters GeoJSON features by one of the properties and returns
  * those outside a percentile rank. (eg. all features which length is above the
  * 80th percentile).
  */
@@ -48,7 +48,7 @@ clog('Loading source data');
 const data = fs.readJsonSync(SRC_FILE);
 
 /**
- * Calculates the percentile rank 
+ * Calculates the percentile rank
  *
  * @param  {Object} data        GeoJSON FeatureCollection.
  * @param  {String} targetFile  Path of the exported file.
@@ -68,7 +68,7 @@ async function run (data, targetFile, property, percentile) {
   let percentileValue = valueList[ordinalRank];
 
   // Filter the data and include everything outside the percentile rank
-  let filteredFeatures = data.features.filter(f => f.properties[property] >= percentileValue)
+  let filteredFeatures = data.features.filter(f => f.properties[property] >= percentileValue);
 
   return fs.writeFile(TARGET_FILE, JSON.stringify(featureCollection(filteredFeatures)));
 }
@@ -82,7 +82,6 @@ async function run (data, targetFile, property, percentile) {
     tStart(`Total run time`)();
     await run(data, TARGET_FILE, PROPERTY, PERCENTILE);
     tEnd(`Total run time`)();
-
   } catch (e) {
     console.log(e);
   }
