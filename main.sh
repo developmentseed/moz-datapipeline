@@ -26,4 +26,10 @@ node ./scripts/indicator-from-areas/index.js .tmp/agriculture-production.geojson
 # Calculate poverty rate for each road segment
 node ./scripts/indicator-from-areas/index.js .tmp/district_boundaries.geojson POV_HCR poverty
 
+# Calculate script
+bash scripts/criticality/criticality.sh
+
+# Attach indicators to RN
+node ./scripts/merge-indicators/index.js .tmp/
+
 bash ./scripts/wrapup.sh

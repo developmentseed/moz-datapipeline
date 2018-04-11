@@ -9,12 +9,13 @@
   "author": "Development Seed <dev@developmentseed.org> (https://developmentseed.org)",
   "license": "MIT",
   "engines": {
-    "node": "6.x"
+    "node": "8.x"
   },
   "dependencies": {
     "@turf/bbox": "^5.1.5",
     "@turf/buffer": "^5.1.5",
     "@turf/intersect": "^5.1.6",
+    "@turf/length": "^5.1.5",
     "@turf/line-split": "^5.1.5",
     "@turf/turf": "^5.1.6",
     "babel-plugin-syntax-async-functions": "^6.13.0",
@@ -31,7 +32,7 @@
     "lodash.camelcase": "^4.3.0",
     "node-cleanup": "^2.1.2",
     "osm2obj": "^3.0.0",
-    "osrm": "^5.15.2",
+    "osrm": "5.16.4",
     "rbush": "^2.0.2",
     "through2": "^2.0.3"
   },

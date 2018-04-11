@@ -2,7 +2,7 @@
 
 apt-get update
 apt-get -y upgrade
-apt-get install -y gdal-bin libsqlite3-dev zlib1g-dev python-pip apt-transport-https ca-certificates software-properties-common
+apt-get install -y gdal-bin libsqlite3-dev zlib1g-dev python-pip gdal-bin python-gdal apt-transport-https ca-certificates software-properties-common
 
 # Utils - Remove afterwards
 apt-get install -y curl git build-essential make
@@ -19,8 +19,8 @@ apt-get install -y docker-ce
 groupadd docker
 usermod -aG docker $USER
 
-# Node JS 6.x (Specific version needed because of OSRM)
-curl -sL https://deb.nodesource.com/setup_6.x | bash -
+# Node JS 8.x (Specific version needed because of OSRM)
+curl -sL https://deb.nodesource.com/setup_8.x | bash -
 apt-get install -y nodejs
 
 # Yarn package manager

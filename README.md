@@ -27,7 +27,8 @@ The scripts to calculate the different indicators (poverty rate, agriculture pot
 
 - the input data for the scripts is stored in the `./source` folder
 - a script writes the final indicator to a CSV file in the `./output` folder. The requirements for these files are:  
-  - the file contains two columns: `road_id` and `value`. Any additional columns are ignored by the data pipeline.
+  - the file contains two columns: `way_id` and `score`. Any additional columns are ignored by the data pipeline.
+  - the value for `score` should normalizes throughout the indicators and be between 0 and 100.
   - each file contains the value for one indicator. If the script calculates multiple indicators for each road segment, these need to be stored in separate files.
   - the CSV file needs to be named after the indicator. The data pipeline will use the basename of the CSV file (without extension) as the name of the attribute in the final Vector Tiles
 - temporary data can be written to the `./tmp` folder. This will be created on start of the data pipeline, and cleaned up on finish

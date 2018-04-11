@@ -4,15 +4,39 @@ import path from 'path';
 import Promise from 'bluebird';
 import glob from 'glob';
 import csv from 'csvtojson';
-import nodeCleanup from 'node-cleanup';
 import camelcase from 'lodash.camelcase';
 
-import {tStart, tEnd, jsonToFile} from '../utils/logging';
+import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
+
+/**
+ * Adds values from the indicator files to each way of the road network.
+ *
+ * Usage:
+ *  $node ./scripts/merge-indicators [source-dir]
+ *
+ */
+
+// This script requires 1 parameters.
+const [, , OUTPUT_DIR] = process.argv;
+
+if (!OUTPUT_DIR) {
+  console.log(`This script requires one parameters to run:
+  1. Directory where the source files are.
+
+  Required files:
+  - roadnetwork.geojson
+  - indicator-[indicator-name].csv (one or more)
+
+  The resulting road network will be save to roadnetwork-indicators.geojson.
+  
+  Eg. $node ./scripts/merge-indicators .tmp/`);
+
+  process.exit(1);
+}
 
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 const LOG_DIR = path.resolve(__dirname, '../../log/merge-indicators');
 
 const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
@@ -21,16 +45,7 @@ const OUTPUT_RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork-indicators.geojson'
 // Number of concurrent operations to run.
 const CONCURR_OPS = 5;
 
-// Store all the logs to write them to a file on exit.
-var logData = [];
-function clog (...args) {
-  logData.push(args.join(' '));
-  console.log(...args);
-}
-// Write logging to file.
-nodeCleanup(function (exitCode, signal) {
-  fs.writeFileSync(`${LOG_DIR}/log-${Date.now()}.txt`, logData.join('\n'));
-});
+const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 // rnData will be modified by the functions.
 var rnData = fs.readJsonSync(RN_FILE);
@@ -100,7 +115,7 @@ function attachIndicatorToRN (filePath) {
           return;
         }
 
-        feat.properties[indId] = json.score;
+        feat.properties[indId] = parseFloat(json.score);
         visited.push(json.way_id);
       })
       .on('done', err => {

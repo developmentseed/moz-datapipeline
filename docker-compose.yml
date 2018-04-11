@@ -2,6 +2,13 @@ version: '3.2'
 
 services:
   moz-datapipeline:
+    environment:
+      # When running docker in docker the volume bindings in the inner docker
+      # are always relative to the root because we're using the same socket.
+      # Because of this whenever we need to access one of the root volumes
+      # (like source) we need to use the full path. Since this is not naturally
+      # available inside the container we need to pass a variable.
+      - ROOT_DIR=${PWD}
     build: ./
     container_name: moz-datapipeline
     volumes:
@@ -9,11 +16,11 @@ services:
         source: ./output
         target: /var/pipeline/output
       - type: bind
+        source: ./.tmp
+        target: /var/pipeline/.tmp
+      - type: bind
         source: ./source
         target: /var/pipeline/source
         read_only: true
+      - /var/run/docker.sock:/var/run/docker.sock
     command: bash ./main.sh
-
-volumes:
-  output:
-  source:
