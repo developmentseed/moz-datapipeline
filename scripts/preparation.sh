@@ -46,7 +46,11 @@ checkRequiredFile './source/road-network' '*.shp' RN_FILE
 checkRequiredFile './source/bridges' '*.shp' BRIDGE_FILE
 checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
+<<<<<<< HEAD
+checkRequiredFile './source/agriculture' '*.shp' AG_FILE
+=======
 checkRequiredFile './source/od-pairs' '*.shp' OD_FILE
+>>>>>>> develop
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
@@ -184,12 +188,37 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/district_boundaries.geojson $TMP_DIR/district_boun
     FROM district_boundaries" \
   -nln district_boundaries
 
-echo "All done preparing the base data."
+
+###############################################################################
+#
+# 5. Prepare agricultural data from the SPAM project (IFPRI)
+#
+
+echo "Preparing SPAM data..."
+
+# Write to temp file. This is a separate command so we know the layer name in subsequent ones
+ogr2ogr $TMP_DIR/ag.shp "$AG_FILE" \
+  -t_srs "EPSG:4326"
+
+ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture.geojson $TMP_DIR/ag.shp \
+  -sql "SELECT alloc_key, ag_bykm \
+    FROM ag"
+
+# Generate an agriculture shapefile with the polygons centerpoints
+ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture-centroid.geojson $TMP_DIR/ag.shp \
+  -dialect sqlite \
+  -sql "SELECT ST_Centroid(geometry), ag_bykm FROM ag"
+
+# Filter the centroids to the top 20%
+node ./scripts/filter-percentile ./.tmp/agriculture-centerpoints.geojson ./.tmp/agriculture-potential.geojson ag_bykm 80
+
+rm $TMP_DIR/agriculture-centerpoints.geojson
+rm $TMP_DIR/ag.*
 
 
 ###############################################################################
 #
-# 5. Generate OD pair data
+# 6. Generate OD pair data
 #
 
 echo "Preparing OD data..."
@@ -201,7 +230,7 @@ echo "All done preparing the OD data."
 
 ###############################################################################
 #
-# 6. Add additional properties to each of the road segments:
+# 7. Add additional properties to each of the road segments:
 #   - bridgeAmount - total number of bridges on segment
 #   - bridgeLength - length of bridges on segment, in meters
 #   - culvertAmount - total number of culverts
@@ -213,3 +242,5 @@ echo "Add additional properties to road network..."
 
 # Additional properties to be included in the roadnetwork geojson
 node ./scripts/additional-props/index.js .tmp/
+
+echo "All done preparing the base data."
