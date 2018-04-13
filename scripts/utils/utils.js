@@ -2,6 +2,9 @@
 import fs from 'fs-extra';
 import Promise from 'bluebird';
 import { spawn } from 'child_process';
+import bbox from '@turf/bbox';
+import rbush from 'rbush';
+import csvStringify from 'csv-stringify';
 
 /**
  * Tap into a promise and run the given function.
@@ -63,6 +66,47 @@ export function runCmd (cmd, args, env = {}, logFile) {
       } else {
         return reject(new Error(error || 'Unknown error. Code: ' + code));
       }
+    });
+  });
+}
+
+/**
+ * Creates rbush tree form the bbox of input features.
+ *
+ * @param  {Object} areas       Input FeatureCollection.
+ * @param  {String} indProperty Property of the indicator
+ *
+ * @return {Object}             Rbush tree.
+ */
+export function prepTree (areas, indProperty) {
+  var tree = rbush();
+  tree.load(areas.features
+    .filter(f => f.properties[indProperty] > 0)
+    .map(f => {
+      let b = bbox(f);
+      return {
+        minX: b[0],
+        minY: b[1],
+        maxX: b[2],
+        maxY: b[3],
+        feat: f
+      };
+    }));
+  return tree;
+}
+
+/**
+ * Converts given object to csv.
+ *
+ * @param  {Object} data       Data to convert to csv. Keys will be used
+ *                             as headers.
+ * @return {Promise}           Csv data stringified.
+ */
+export function dataToCSV (data) {
+  return new Promise((resolve, reject) => {
+    csvStringify(data, {header: true}, (err, output) => {
+      if (err) return reject(err);
+      return resolve(output);
     });
   });
 }
