@@ -9,7 +9,7 @@ import { point } from '@turf/helpers';
 import length from '@turf/length';
 import csvStringify from 'csv-stringify';
 
-import {prepTree} from '../utils/utils';
+import { prepTree } from '../utils/utils';
 import { tStart, tEnd, initLog } from '../utils/logging';
 
 /**
@@ -76,7 +76,7 @@ function dataToCSV (data) {
  * @return Promise{}            Resolves when file was written.
  */
 async function run (ways, tree, indProperty) {
-  const waysScore = ways.map((way, idx) => {
+  const wayValues = ways.map((way, idx) => {
     const id = `${idx + 1}/${ways.length}`;
     clog(`Handling way ${id}`);
     const wayBbox = bbox(way);
@@ -139,11 +139,16 @@ async function run (ways, tree, indProperty) {
 
     return {
       way_id: way.properties.NAME,
-      score: weightedIndicator
+      value: weightedIndicator
     };
   });
 
-  const csv = await dataToCSV(waysScore);
+  const maxWayValue = Math.max(...wayValues.map(w => w.value));
+
+  // Scale the values from 0-100
+  const wayScores = wayValues.map(w => ({ ...w, score: w.value / maxWayValue * 100 }));
+
+  const csv = await dataToCSV(wayScores);
   return fs.writeFile(OUTPUT_INDICATOR_FILE, csv);
 }
 

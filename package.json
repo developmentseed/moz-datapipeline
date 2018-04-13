@@ -11,6 +11,11 @@
   "engines": {
     "node": "6.x"
   },
+  "babel": {
+    "plugins": [
+      "transform-object-rest-spread"
+    ]
+  },
   "dependencies": {
     "@turf/bbox": "^5.1.5",
     "@turf/buffer": "^5.1.5",
@@ -19,6 +24,7 @@
     "@turf/line-split": "^5.1.5",
     "@turf/turf": "^5.1.6",
     "babel-plugin-syntax-async-functions": "^6.13.0",
+    "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "babel-plugin-transform-regenerator": "^6.26.0",
     "babel-polyfill": "^6.26.0",
     "babel-preset-es2015": "^6.24.0",
