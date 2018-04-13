@@ -25,6 +25,7 @@
     "babel-register": "^6.23.0",
     "bluebird": "^3.5.1",
     "csv-stringify": "^2.0.2",
+    "csv2geojson": "^5.0.2",
     "csvtojson": "^1.1.9",
     "fs-extra": "^5.0.0",
     "geojson-join": "^1.0.0",

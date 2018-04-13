@@ -45,15 +45,17 @@ clog('Loading point data');
 const bridgeFeatures = fs.readJsonSync(BRIDGE_FILE).features
   .filter(f => f.geometry.type === 'Point')
   .map(f => {
-    // Strip leading 0's from road ID. Eg. N0001 -> N1, and R0529 to R529
+    // Extract ID of the road from the Link_ID. For example:
+    //   N000201:0003.2 -> N2
+    //   R100504:0066.2 -> R1005
     let regexRoadId = /([A-Z])0*([1-9][0-9]*)/;
-    let matchRoadId = f.properties.Road_ID.match(regexRoadId);
-    f.properties.Road_ID = `${matchRoadId[1]}${matchRoadId[2]}`;
+    let matchRoadId = f.properties.Link_ID
+      .substring(0,5)
+      .match(regexRoadId);
+    f.properties.roadID = `${matchRoadId[1]}${matchRoadId[2]}`;
 
-    // Add indication of structure type (bridge / culvert)
-    let regexType = /bridge/i;
-    let matchType = f.properties.Str_Desc.match(regexType);
-    f.properties.type = matchType ? 'bridge' : 'culvert';
+    // Add indication of structure type.
+    f.properties.type = f.properties.Des_Type === 'CULV' ? 'culvert' : 'bridge';
 
     // When bridge length is unknown, assume it is 7 meters
     f.properties.Over_Lengt = f.properties.Over_Lengt === 0 ? 7 : f.properties.Over_Lengt;
@@ -70,8 +72,8 @@ const wayFeatures = fs.readJsonSync(RN_FILE).features
  * Check the road segment that is closest to the bridge / culvert, add the ID
  * of the road segment to the bridge feature, and write the GeoJSON.
  * Since bridges only have a reference to the Road ID (N1) and not the ID of
- * the road segment (N1-T2102), this function has to rely on @turf/distance
- * to lookup the closest segment.
+ * the road segment (N1-T2102), this function relies on @turf/distance to look
+ * the closest segment.
  *
  * @param  {Array} bridgeFeatures An array of GeoJSON point features
  * @param  {Array} wayFeatures    An array of GeoJSON line features
@@ -83,7 +85,7 @@ async function run (bridgeFeatures, wayFeatures) {
     const id = `${i + 1}/${bridgeFeatures.length}`;
 
     // Check what road segments match the Road ID of the bridge.
-    let matchingRoadSegments = wayFeatures.filter(way => way.properties.ROAD_ID === bridge.properties.Road_ID);
+    let matchingRoadSegments = wayFeatures.filter(way => way.properties.ROAD_ID === bridge.properties.roadID);
 
     // Check the closest road segment to the bridge
     tStart(`Check line closest to point ${id}`)();

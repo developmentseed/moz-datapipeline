@@ -43,7 +43,7 @@ echo 'Basic housekeeping...'
 
 # Check for required files and directories
 checkRequiredFile './source/road-network' '*.shp' RN_FILE
-checkRequiredFile './source/bridges' '*.shp' BRIDGE_FILE
+checkRequiredFile './source/bridges' '*.csv' BRIDGE_FILE
 checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
 
@@ -97,35 +97,23 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp \
 #
 # 2. Generate base bridge and culvert data
 #
-# Ingest the Bridge shapefile and:
+# Ingest a CSV file with bridges and culverts and:
+#   - store it in GeoJSON format
 #   - perform a cleanup of the fields. Only keep:
-#       Over_Lengt (Number) - length of the bridge. Example: 21.0
+#       Over_Length (Number) - length of the bridge. Example: 21.0
 #       Num_Spans (Number) - Example: 10
 #       Road_ID (String) - ID of the road the bridge/culvert is part of. Example: R0529
 #       Mat_Type (String) - material type Example: STEL
-#       Str_Desc (String) - Example: Bailey Bridge
 #   - add/update the following properties:
 #     - add ID of the closest road
 #     - add a type (bridge / culvert) based on the name
 #     - add length of 7 in case there is no data on length
-#   - reproject to EPSG:4326
-#   - store it in GeoJSON format
 
 echo "Prepare bridge data..."
 
-ogr2ogr $TMP_DIR/_bridges.shp "$BRIDGE_FILE" \
-  -t_srs "EPSG:4326"
+./node_modules/.bin/csv2geojson $BRIDGE_FILE --lat GPS_S --lon GPS_E > $TMP_DIR/bridges.geojson
 
-ogr2ogr -f "GeoJSON" $TMP_DIR/bridges.geojson $TMP_DIR/_bridges.shp \
-  -dialect sqlite \
-  -sql "SELECT Over_Lengt, Road_ID, Num_Spans, Clear_Soff, Clear_Widt, Mat_Type, Str_Desc, geometry \
-    FROM _bridges" \
-  -nln _bridges
-
-node ./scripts/prep-bridge .tmp/bridges.geojson .tmp/roadnetwork.geojson
-
-# clean up the intermediate shapefiles
-rm $TMP_DIR/_bridges*
+node ./scripts/prep-bridge $TMP_DIR/bridges.geojson $TMP_DIR/roadnetwork.geojson
 
 
 ###############################################################################

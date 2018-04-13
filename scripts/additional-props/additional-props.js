@@ -46,7 +46,7 @@ function addBridgeInfo (way) {
   way.properties.bridgeLength = wayBridges
     .filter(f => f.properties.type === 'bridge')
     .reduce((a, b) => {
-      a += b.properties.Over_Lengt;
+      a += b.properties.Over_Length;
       return a;
     }, 0);
 
