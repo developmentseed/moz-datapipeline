@@ -5,7 +5,7 @@ The img-stats.py script takes in an input directory (either local or on s3) of g
 Currently only the maximum value is included in the output, although other stats could easily be added.
 
 ### Installing img-stats
-img-stats requires [python-rasterstats](https://github.com/perrygeo/python-rasterstats) and [pyproj](https://pypi.python.org/pypi/pyproj), along with the GDAL system library. These are all included in the Docker image in this repository, however it could be run separately using the Dockerfile in this directory, if desired.
+img-stats requires [python-rasterstats](https://github.com/perrygeo/python-rasterstats) and [pyproj](https://pypi.python.org/pypi/pyproj), along with the GDAL system library. Build an image containing all the depdenencies with the Dockerfile in this directory.
 
 ```
 $ docker build . -t imgstats
