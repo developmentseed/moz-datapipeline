@@ -46,11 +46,8 @@ checkRequiredFile './source/road-network' '*.shp' RN_FILE
 checkRequiredFile './source/bridges' '*.csv' BRIDGE_FILE
 checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
-<<<<<<< HEAD
 checkRequiredFile './source/agriculture' '*.shp' AG_FILE
-=======
 checkRequiredFile './source/od-pairs' '*.shp' OD_FILE
->>>>>>> develop
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
@@ -119,7 +116,7 @@ echo "Prepare bridge data..."
 ./node_modules/.bin/csv2geojson $BRIDGE_FILE --lat GPS_S --lon GPS_E > $TMP_DIR/bridges.geojson
 
 node ./scripts/prep-bridge $TMP_DIR/bridges.geojson $TMP_DIR/roadnetwork.geojson
-
+cp $TMP_DIR/bridges.geojson ./output
 
 ###############################################################################
 #
@@ -198,10 +195,7 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture-centroid.geojson $TMP_DIR/ag.shp \
   -sql "SELECT ST_Centroid(geometry), ag_bykm FROM ag"
 
 # Filter the centroids to the top 20%
-node ./scripts/filter-percentile ./.tmp/agriculture-centerpoints.geojson ./.tmp/agriculture-potential.geojson ag_bykm 80
-
-rm $TMP_DIR/agriculture-centerpoints.geojson
-rm $TMP_DIR/ag.*
+node ./scripts/filter-percentile ./.tmp/agriculture-centroid.geojson ./.tmp/agriculture-potential.geojson ag_bykm 80
 
 
 ###############################################################################
@@ -229,6 +223,6 @@ echo "All done preparing the OD data."
 echo "Add additional properties to road network..."
 
 # Additional properties to be included in the roadnetwork geojson
-node ./scripts/additional-props/index.js .tmp/
+node ./scripts/additional-props/index.js
 
 echo "All done preparing the base data."

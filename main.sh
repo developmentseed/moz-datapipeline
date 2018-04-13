@@ -33,6 +33,6 @@ node ./scripts/indicator-from-prop/index.js AADT
 bash scripts/criticality/criticality.sh
 
 # Attach indicators to RN
-node ./scripts/merge-indicators/index.js .tmp/
+node ./scripts/merge-indicators/index.js
 
-bash ./scripts/wrapup.sh
+rm -r .tmp

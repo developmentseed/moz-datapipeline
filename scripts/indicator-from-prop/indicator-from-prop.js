@@ -32,12 +32,13 @@ if (!PROPERTY) {
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../.tmp');
+const OUTPUT_DIR = path.resolve(__dirname, '../../output');
+const SRC_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/indicator-from-prop');
 
-const indName = `${PROPERTY.toLowerCase()}-score`;
+const indName = `${PROPERTY.toLowerCase()}`;
 
-const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
+const RN_FILE = path.resolve(SRC_DIR, 'roadnetwork.geojson');
 const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${indName}.csv`);
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
@@ -58,6 +59,7 @@ async function run (ways, indProperty) {
 
   const waysScore = ways.map(way => ({
     way_id: way.properties.NAME,
+    value: way.properties[indProperty],
     score: Math.round(way.properties[indProperty] / maxScore * 100)
   }));
 
@@ -69,6 +71,7 @@ async function run (ways, indProperty) {
   try {
     await Promise.all([
       fs.ensureDir(OUTPUT_DIR),
+      fs.ensureDir(SRC_DIR),
       fs.ensureDir(LOG_DIR)
     ]);
 

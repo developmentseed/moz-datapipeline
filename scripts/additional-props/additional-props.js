@@ -12,38 +12,25 @@ import { tStart, tEnd, initLog } from '../utils/logging';
  * - Road length
  * - Number of bridges and culverts
  *
+ * Required files:
+ * - roadnetwork.geojson
+ * - bridges.geojson
+ * - prov_boundaries.geojson
+ *
  * Usage:
- *  $node ./scripts/additional-props [source-dir]
+ *  $node ./scripts/additional-props
  *
  */
-
-// This script requires 1 parameters.
-const [, , OUTPUT_DIR] = process.argv;
-
-if (!OUTPUT_DIR) {
-  console.log(`This script requires one parameters to run:
-  1. Directory where the source files are.
-
-  Required files:
-  - roadnetwork.geojson
-  - bridges.geojson
-  - prov_boundaries.geojson
-
-  The roadnetwork.geojson file will be overwritten with new properties.
-  
-  Eg. $node ./scripts/additional-props .tmp/`);
-
-  process.exit(1);
-}
 
 // //////////////////////////////////////////////////////////
 // Config Vars
 
+const SRC_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/additional-props');
 
-const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
-const BRIDGE_FILE = path.resolve(OUTPUT_DIR, 'bridges.geojson');
-const BOUND_FILES = path.resolve(OUTPUT_DIR, 'prov_boundaries.geojson');
+const RN_FILE = path.resolve(SRC_DIR, 'roadnetwork.geojson');
+const BRIDGE_FILE = path.resolve(SRC_DIR, 'bridges.geojson');
+const BOUND_FILES = path.resolve(SRC_DIR, 'prov_boundaries.geojson');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -95,7 +82,7 @@ function run (rnData) {
 (async function main () {
   try {
     await Promise.all([
-      fs.ensureDir(OUTPUT_DIR),
+      fs.ensureDir(SRC_DIR),
       fs.ensureDir(LOG_DIR)
     ]);
 

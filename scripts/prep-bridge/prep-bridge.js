@@ -33,10 +33,10 @@ if (!BRIDGE_FILE || !RN_FILE) {
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../.tmp');
+const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/prep-bridge');
 
-const OUTPUT_FILE = path.resolve(OUTPUT_DIR, 'bridges.geojson');
+const OUTPUT_FILE = path.resolve(TMP_DIR, 'bridges.geojson');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -114,7 +114,7 @@ async function run (bridgeFeatures, wayFeatures) {
 (async function main () {
   try {
     await Promise.all([
-      fs.ensureDir(OUTPUT_DIR),
+      fs.ensureDir(TMP_DIR),
       fs.ensureDir(LOG_DIR)
     ]);
 
