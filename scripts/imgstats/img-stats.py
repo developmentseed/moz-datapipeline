@@ -30,7 +30,6 @@ def s3_list(uri):
     s3 = boto3.client('s3')
     s3_uri = uri_parser(uri)
     response = s3.list_objects_v2(Bucket=s3_uri['bucket'], Prefix=s3_uri['key'])
-
     filenames = []
     if 'Contents' in response.keys():
         for file in response['Contents']:
@@ -122,27 +121,31 @@ def copy_files(filenames, path='/tmp'):
     return fnames
 
 
-def main(inputdir, aoi, path):
+def main(inputdir, aoi, path, id_property='NAME'):
     filenames = copy_files(find_files(inputdir), path=path)
     copy_files(find_files(inputdir, ext='csv'), path=path)
-    fout = os.path.join(path, os.path.splitext(os.path.basename(aoi))[0] + '.csv')
+    fout = os.path.join(path, os.path.splitext(os.path.basename(aoi))[0] + '_stats.csv')
     if not os.path.exists(fout):
         # calculate stats
         with open(str(aoi), 'r') as f:
             gj = json.loads(f.read())
+        numfeatures = len(gj['features'])
         f = open(fout, 'w')
-        f.write('RoadID, max' + '\n')
-        print(os.path.join(path, fout))
-        for feat in gj['features']:
+        f.write('fid, max' + '\n')
+        print('Saving output to %s' % fout)
+        for i, feat in enumerate(gj['features']):
             if feat['geometry'] is not None:
+                fid = feat['properties'][id_property]
+                print('Calculating stats for fid %s (%s of %s)' % (fid, i+1, numfeatures))
                 stats = get_stats(filenames, feat['geometry'])
                 maxval = max([s['max'] for s in stats])
                 #if maxval == 999 or maxval == -9999:
                 #    import pdb; pdb.set_trace()
-                f.write('%s,%s\n' % (feat['properties']['NAME'], maxval))
+                f.write('%s,%s\n' % (fid, maxval))
         f.close()
         # upload to s3
-        upload(fout, inputdir)
+        if inputdir[0:5] == 's3://':
+            upload(fout, inputdir)
 
 
 def parse_args(args):
