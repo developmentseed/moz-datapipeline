@@ -43,14 +43,11 @@ echo 'Basic housekeeping...'
 
 # Check for required files and directories
 checkRequiredFile './source/road-network' '*.shp' RN_FILE
-checkRequiredFile './source/bridges' '*.shp' BRIDGE_FILE
+checkRequiredFile './source/bridges' '*.csv' BRIDGE_FILE
 checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
-<<<<<<< HEAD
 checkRequiredFile './source/agriculture' '*.shp' AG_FILE
-=======
 checkRequiredFile './source/od-pairs' '*.shp' OD_FILE
->>>>>>> develop
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
@@ -102,36 +99,24 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp \
 #
 # 2. Generate base bridge and culvert data
 #
-# Ingest the Bridge shapefile and:
+# Ingest a CSV file with bridges and culverts and:
+#   - store it in GeoJSON format
 #   - perform a cleanup of the fields. Only keep:
-#       Over_Lengt (Number) - length of the bridge. Example: 21.0
+#       Over_Length (Number) - length of the bridge. Example: 21.0
 #       Num_Spans (Number) - Example: 10
 #       Road_ID (String) - ID of the road the bridge/culvert is part of. Example: R0529
 #       Mat_Type (String) - material type Example: STEL
-#       Str_Desc (String) - Example: Bailey Bridge
 #   - add/update the following properties:
 #     - add ID of the closest road
 #     - add a type (bridge / culvert) based on the name
 #     - add length of 7 in case there is no data on length
-#   - reproject to EPSG:4326
-#   - store it in GeoJSON format
 
 echo "Prepare bridge data..."
 
-ogr2ogr $TMP_DIR/_bridges.shp "$BRIDGE_FILE" \
-  -t_srs "EPSG:4326"
+./node_modules/.bin/csv2geojson $BRIDGE_FILE --lat GPS_S --lon GPS_E > $TMP_DIR/bridges.geojson
 
-ogr2ogr -f "GeoJSON" $TMP_DIR/bridges.geojson $TMP_DIR/_bridges.shp \
-  -dialect sqlite \
-  -sql "SELECT Over_Lengt, Road_ID, Num_Spans, Clear_Soff, Clear_Widt, Mat_Type, Str_Desc, geometry \
-    FROM _bridges" \
-  -nln _bridges
-
-node ./scripts/prep-bridge .tmp/bridges.geojson .tmp/roadnetwork.geojson
-
-# clean up the intermediate shapefiles
-rm $TMP_DIR/_bridges*
-
+node ./scripts/prep-bridge $TMP_DIR/bridges.geojson $TMP_DIR/roadnetwork.geojson
+cp $TMP_DIR/bridges.geojson ./output
 
 ###############################################################################
 #
@@ -210,10 +195,7 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture-centroid.geojson $TMP_DIR/ag.shp \
   -sql "SELECT ST_Centroid(geometry), ag_bykm FROM ag"
 
 # Filter the centroids to the top 20%
-node ./scripts/filter-percentile ./.tmp/agriculture-centerpoints.geojson ./.tmp/agriculture-potential.geojson ag_bykm 80
-
-rm $TMP_DIR/agriculture-centerpoints.geojson
-rm $TMP_DIR/ag.*
+node ./scripts/filter-percentile ./.tmp/agriculture-centroid.geojson ./.tmp/agriculture-potential.geojson ag_bykm 80
 
 
 ###############################################################################
@@ -241,6 +223,6 @@ echo "All done preparing the OD data."
 echo "Add additional properties to road network..."
 
 # Additional properties to be included in the roadnetwork geojson
-node ./scripts/additional-props/index.js .tmp/
+node ./scripts/additional-props/index.js
 
 echo "All done preparing the base data."

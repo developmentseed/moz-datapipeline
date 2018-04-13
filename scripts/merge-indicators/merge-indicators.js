@@ -12,34 +12,19 @@ import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
  * Adds values from the indicator files to each way of the road network.
  *
  * Usage:
- *  $node ./scripts/merge-indicators [source-dir]
+ *  $node ./scripts/merge-indicators
  *
  */
-
-// This script requires 1 parameters.
-const [, , OUTPUT_DIR] = process.argv;
-
-if (!OUTPUT_DIR) {
-  console.log(`This script requires one parameters to run:
-  1. Directory where the source files are.
-
-  Required files:
-  - roadnetwork.geojson
-  - indicator-[indicator-name].csv (one or more)
-
-  The resulting road network will be save to roadnetwork-indicators.geojson.
-  
-  Eg. $node ./scripts/merge-indicators .tmp/`);
-
-  process.exit(1);
-}
 
 // //////////////////////////////////////////////////////////
 // Config Vars
 
 const LOG_DIR = path.resolve(__dirname, '../../log/merge-indicators');
 
-const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
+const TMP_DIR = path.resolve(__dirname, '../../.tmp');
+const OUTPUT_DIR = path.resolve(__dirname, '../../output');
+
+const RN_FILE = path.resolve(TMP_DIR, 'roadnetwork.geojson');
 const OUTPUT_RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork-indicators.geojson');
 
 // Number of concurrent operations to run.
@@ -87,8 +72,8 @@ function getIndicatorFiles () {
 }
 
 /**
- * Attaches the indicator value found in the file to the ways of the road
- * network. Modifies the rnData object
+ * Attaches the indicator value and score found in the file to the ways of the
+ * road network. Modifies the rnData object
  * The property name will be derived from the file name. When the indicator
  * name has dashes it will be camelCased.
  *
@@ -115,7 +100,9 @@ function attachIndicatorToRN (filePath) {
           return;
         }
 
-        feat.properties[indId] = parseFloat(json.score);
+        feat.properties[`${indId}Score`] = parseFloat(json.score);
+        // Value is optional
+        if (json.value) feat.properties[`${indId}Value`] = parseFloat(json.value);
         visited.push(json.way_id);
       })
       .on('done', err => {
@@ -150,6 +137,7 @@ function attachIndicatorToRN (filePath) {
   try {
     await Promise.all([
       fs.ensureDir(OUTPUT_DIR),
+      fs.ensureDir(TMP_DIR),
       fs.ensureDir(LOG_DIR)
     ]);
 
