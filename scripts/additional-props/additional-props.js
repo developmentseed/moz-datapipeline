@@ -6,14 +6,39 @@ import length from '@turf/length';
 
 import { tStart, tEnd, initLog } from '../utils/logging';
 
-// Include additional properties on the Road Network:
-// - Province the road runs through
-// - Road length
+/**
+ * Include additional properties on the Road Network:
+ * - Province the road runs through
+ * - Road length
+ * - Number of bridges and culverts
+ *
+ * Usage:
+ *  $node ./scripts/additional-props [source-dir]
+ *
+ */
+
+// This script requires 1 parameters.
+const [, , OUTPUT_DIR] = process.argv;
+
+if (!OUTPUT_DIR) {
+  console.log(`This script requires one parameters to run:
+  1. Directory where the source files are.
+
+  Required files:
+  - roadnetwork.geojson
+  - bridges.geojson
+  - prov_boundaries.geojson
+
+  The roadnetwork.geojson file will be overwritten with new properties.
+  
+  Eg. $node ./scripts/additional-props .tmp/`);
+
+  process.exit(1);
+}
 
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/additional-props');
 
 const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');

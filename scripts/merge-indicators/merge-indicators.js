@@ -8,10 +8,35 @@ import camelcase from 'lodash.camelcase';
 
 import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
 
+/**
+ * Adds values from the indicator files to each way of the road network.
+ *
+ * Usage:
+ *  $node ./scripts/merge-indicators [source-dir]
+ *
+ */
+
+// This script requires 1 parameters.
+const [, , OUTPUT_DIR] = process.argv;
+
+if (!OUTPUT_DIR) {
+  console.log(`This script requires one parameters to run:
+  1. Directory where the source files are.
+
+  Required files:
+  - roadnetwork.geojson
+  - indicator-[indicator-name].csv (one or more)
+
+  The resulting road network will be save to roadnetwork-indicators.geojson.
+  
+  Eg. $node ./scripts/merge-indicators .tmp/`);
+
+  process.exit(1);
+}
+
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/merge-indicators');
 
 const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');

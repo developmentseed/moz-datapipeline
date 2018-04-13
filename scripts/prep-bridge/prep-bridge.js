@@ -25,7 +25,7 @@ if (!BRIDGE_FILE || !RN_FILE) {
   1. a GeoJSON with point data for the bridges and culverts;
   2. a GeoJSON with line data for the road network.
   
-  Eg. $node ./scripts/nearest-line .tmp/bridges.geojson .tmp/roadnetwork.geojson`);
+  Eg. $node ./scripts/prep-bridge .tmp/bridges.geojson .tmp/roadnetwork.geojson`);
 
   process.exit(1);
 }

@@ -7,9 +7,8 @@ import lineSplit from '@turf/line-split';
 import pointWithinPolygon from '@turf/points-within-polygon';
 import { point } from '@turf/helpers';
 import length from '@turf/length';
-import csvStringify from 'csv-stringify';
 
-import { prepTree } from '../utils/utils';
+import { prepTree, dataToCSV } from '../utils/utils';
 import { tStart, tEnd, initLog } from '../utils/logging';
 
 /**
@@ -56,15 +55,6 @@ clog('Loading Road Network');
 const ways = fs.readJsonSync(RN_FILE).features;
 clog('Loading Source Data');
 const areasData = fs.readJsonSync(AREAS_FILE);
-
-function dataToCSV (data) {
-  return new Promise((resolve, reject) => {
-    csvStringify(data, {header: true}, (err, output) => {
-      if (err) return reject(err);
-      return resolve(output);
-    });
-  });
-}
 
 /**
  * Runs the analysis, calculating a weighted score for each way.

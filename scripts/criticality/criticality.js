@@ -5,18 +5,48 @@ import Promise from 'bluebird';
 import OSRM from 'osrm';
 
 import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
-import { runCmd } from '../utils/utils';
+import { runCmd, dataToCSV } from '../utils/utils';
+
+/**
+ * Performs the criticality analysis outputting the indicator score.
+ *
+ * Usage:
+ *  $node ./scripts/criticality [source-dir]
+ *
+ */
+
+// This script requires 1 parameters.
+const [, , OUTPUT_DIR] = process.argv;
+const { ROOT_DIR } = process.env;
+
+if (!OUTPUT_DIR) {
+  console.log(`This script requires one parameters to run:
+  1. Directory where the source files are.
+
+  Required files:
+  - od.geojson
+  - roadnetwork-osm-ways.json
+  - osrm/
+
+  The resulting ways index will be saves as indicator-criticality.csv.
+  
+  Eg. $node ./scripts/criticality .tmp/`);
+
+  process.exit(1);
+}
 
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 const TMP_DIR = path.resolve(__dirname, '../../.tmp/criticality');
 const LOG_DIR = path.resolve(__dirname, '../../log/criticality');
 
 const OD_FILE = path.resolve(OUTPUT_DIR, 'od.geojson');
 const WAYS_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork-osm-ways.json');
 const OSRM_FOLDER = path.resolve(OUTPUT_DIR, 'osrm');
+
+const IND_NAME = 'criticality';
+const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
 
 // Number of concurrent operations to run.
 const CONCURR_OPS = 5;
@@ -73,7 +103,35 @@ async function run (ways, odPairs) {
   clog('changes', result.filter(o => o.time > 0));
   clog('data length', result.length);
 
-  return jsonToFile(`${LOG_DIR}/criticality.json`)(result);
+  // Calculate score (0 - 100)
+  // maxtime: normalize values taking into account affected and unroutable pairs.
+  // maxUnroutable: self describing.
+  // Use same reduce to avoid additional loops.
+  const { avgMaxTime, maxUnroutable } = result.reduce((acc, o) => ({
+    avgMaxTime: Math.max(acc.avgMaxTime, (o.unroutablePairs + o.impactedPairs) * o.avgTimeNonZero),
+    maxUnroutable: Math.max(acc.maxUnroutable, o.unroutablePairs)
+  }), { avgMaxTime: 0, maxUnroutable: 0 });
+
+  const scoredRes = result.map(segment => {
+    const timeScore = ((segment.unroutablePairs + segment.impactedPairs) * segment.avgTimeNonZero) / avgMaxTime;
+    const unroutableScore = segment.unroutablePairs / maxUnroutable;
+
+    // Time is 40%, unroutable is 60%.
+    // Then normalize to 0 - 100 scale.
+    segment.score = ((timeScore || 0) * 0.4 + (unroutableScore || 0) * 0.6) * 100;
+
+    return segment;
+  });
+
+  await jsonToFile(`${LOG_DIR}/criticality.json`)(scoredRes);
+
+  const waysScore = scoredRes.map(o => ({
+    way_id: o.name,
+    score: o.score
+  }));
+
+  const csv = await dataToCSV(waysScore);
+  return fs.writeFile(OUTPUT_INDICATOR_FILE, csv);
 }
 
 /**
@@ -242,6 +300,8 @@ async function calcTimePenaltyForWay (way, coords, benchmark) {
     wayId: way.id,
     name: way.tags.NAME,
     maxTime: Math.max(...timeDeltas),
+    avgTime: timeDeltas.reduce((a, b) => a + b) / timeDeltas.length,
+    avgTimeNonZero: (timeDeltas.reduce((a, b) => a + b) / timeDeltas.reduce((acc, o) => acc + Number(!!o), 0)) || 0,
     unroutablePairs,
     impactedPairs
   };
@@ -265,10 +325,13 @@ async function ignoreSegment (way, osrmFolder) {
   const identifier = way.id;
   const speedProfileFile = `${TMP_DIR}/speed-${identifier}.csv`;
   const rootPath = path.resolve(__dirname, '../..');
+  // The dockerVolMount depends on whether we're running this from another docker
+  // container or directly. See docker-compose.yml for an explanantion.
+  const dockerVolMount = ROOT_DIR || rootPath;
 
-  // Path relative to ../.. for docker
-  const relativeOSRM = path.relative(rootPath, osrmFolder);
-  const relativeSpeedProf = path.relative(rootPath, speedProfileFile);
+  // Paths for the files depending from where this is being run.
+  const pathOSRM = ROOT_DIR ? osrmFolder.replace(rootPath, ROOT_DIR) : osrmFolder;
+  const pathSpeedProf = ROOT_DIR ? speedProfileFile.replace(rootPath, ROOT_DIR) : speedProfileFile;
 
   tStart(`WAY ${identifier} traffic profile`)();
   await createSpeedProfile(speedProfileFile, way);
@@ -279,11 +342,11 @@ async function ignoreSegment (way, osrmFolder) {
     'run',
     '--rm',
     '-t',
-    '-v', `${rootPath}:/data`,
-    'osrm/osrm-backend:v5.15.0',
+    '-v', `${dockerVolMount}:${dockerVolMount}`,
+    'osrm/osrm-backend:v5.16.4',
     'osrm-contract',
-    '--segment-speed-file', `/data/${relativeSpeedProf}`,
-    `/data/${relativeOSRM}/roadnetwork.osrm`
+    '--segment-speed-file', pathSpeedProf,
+    `${pathOSRM}/roadnetwork.osrm`
   ], {}, `${LOG_DIR}/osm-contract-logs/way-${way.id}.log`);
   tEnd(`WAY ${identifier} osm-contract`)();
 }
@@ -335,5 +398,6 @@ function createSpeedProfile (speedProfileFile, way) {
     tEnd(`Total run time`)();
   } catch (e) {
     console.log(e);
+    process.exit(1);
   }
 }());
