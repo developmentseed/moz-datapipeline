@@ -58,7 +58,7 @@ const bridgeFeatures = fs.readJsonSync(BRIDGE_FILE).features
     f.properties.type = f.properties.Des_Type === 'CULV' ? 'culvert' : 'bridge';
 
     // When bridge length is unknown, assume it is 7 meters
-    f.properties.Over_Lengt = f.properties.Over_Lengt === 0 ? 7 : f.properties.Over_Lengt;
+    f.properties.Over_Length = f.properties.Over_Length === 0 ? 7 : f.properties.Over_Length;
 
     return f;
   });
