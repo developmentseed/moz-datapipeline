@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import bbox from '@turf/bbox';
 import rbush from 'rbush';
 import csvStringify from 'csv-stringify';
+import csvParse from 'csv-parse';
 
 /**
  * Tap into a promise and run the given function.
@@ -105,6 +106,22 @@ export function prepTree (areas, indProperty) {
 export function dataToCSV (data) {
   return new Promise((resolve, reject) => {
     csvStringify(data, {header: true}, (err, output) => {
+      if (err) return reject(err);
+      return resolve(output);
+    });
+  });
+}
+
+/**
+ * Parses csv file into an array of objects (row)
+ *
+ * @param  {Object} data       CSV data to parse. Keys will be derived from
+                               column names.
+ * @return {Promise}           Parsed CSV
+ */
+export function dataFromCSV (data) {
+  return new Promise((resolve, reject) => {
+    csvParse(data, {columns: true}, (err, output) => {
       if (err) return reject(err);
       return resolve(output);
     });
