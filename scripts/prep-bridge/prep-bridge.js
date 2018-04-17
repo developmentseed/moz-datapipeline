@@ -57,6 +57,9 @@ const bridgeFeatures = fs.readJsonSync(BRIDGE_FILE).features
     // Add indication of structure type.
     f.properties.type = f.properties.Des_Type === 'CULV' ? 'culvert' : 'bridge';
 
+    // Remove decimal markers from string and turn Length into a number
+    f.properties.Over_Length = Number(f.properties.Over_Length.replace(',', ''))
+
     // When bridge length is unknown, assume it is 7 meters
     f.properties.Over_Length = f.properties.Over_Length === 0 ? 7 : f.properties.Over_Length;
 
