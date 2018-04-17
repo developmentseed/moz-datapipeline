@@ -113,22 +113,6 @@ export function dataToCSV (data) {
 }
 
 /**
- * Parses csv file into an array of objects (row)
- *
- * @param  {Object} data       CSV data to parse. Keys will be derived from
-                               column names.
- * @return {Promise}           Parsed CSV
- */
-export function dataFromCSV (data) {
-  return new Promise((resolve, reject) => {
-    csvParse(data, {columns: true}, (err, output) => {
-      if (err) return reject(err);
-      return resolve(output);
-    });
-  });
-}
-
-/**
  * Adds a scaled score (0-100) to objects
  *
  * @param  {Array} data        Data to add the score to. Each object contains at least
