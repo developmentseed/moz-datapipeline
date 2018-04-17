@@ -50,7 +50,7 @@ const bridgeFeatures = fs.readJsonSync(BRIDGE_FILE).features
     //   R100504:0066.2 -> R1005
     let regexRoadId = /([A-Z])0*([1-9][0-9]*)/;
     let matchRoadId = f.properties.Link_ID
-      .substring(0,5)
+      .substring(0, 5)
       .match(regexRoadId);
     f.properties.roadID = `${matchRoadId[1]}${matchRoadId[2]}`;
 
@@ -58,7 +58,7 @@ const bridgeFeatures = fs.readJsonSync(BRIDGE_FILE).features
     f.properties.type = f.properties.Des_Type === 'CULV' ? 'culvert' : 'bridge';
 
     // Remove decimal markers from string and turn Length into a number
-    f.properties.Over_Length = Number(f.properties.Over_Length.replace(',', ''))
+    f.properties.Over_Length = Number(f.properties.Over_Length.replace(',', ''));
 
     // When bridge length is unknown, assume it is 7 meters
     f.properties.Over_Length = f.properties.Over_Length === 0 ? 7 : f.properties.Over_Length;
