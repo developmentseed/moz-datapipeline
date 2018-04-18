@@ -39,6 +39,7 @@
     "glob": "^7.1.2",
     "lodash.camelcase": "^4.3.0",
     "node-cleanup": "^2.1.2",
+    "node-fetch": "^2.1.2",
     "osm2obj": "^3.0.0",
     "osrm": "5.16.4",
     "rbush": "^2.0.2",
