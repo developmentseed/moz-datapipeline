@@ -5,7 +5,6 @@ import { spawn } from 'child_process';
 import bbox from '@turf/bbox';
 import rbush from 'rbush';
 import csvStringify from 'csv-stringify';
-import csvParse from 'csv-parse';
 
 /**
  * Tap into a promise and run the given function.
