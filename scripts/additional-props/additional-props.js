@@ -10,7 +10,7 @@ import { tStart, tEnd, initLog } from '../utils/logging';
  * Include additional properties on the Road Network:
  * - Province the road runs through
  * - Road length
- * - Number of bridges and culverts
+ * - Bridges and culverts
  *
  * Required files:
  * - roadnetwork.geojson
@@ -55,18 +55,12 @@ function addWayProvince (way) {
 
 function addBridgeInfo (way) {
   const wayBridges = bridgeData.features.filter(f => f.properties.roadSegmentID === way.properties.NAME);
-  way.properties.bridgeLength = wayBridges
-    .filter(f => f.properties.type === 'bridge')
-    .reduce((a, b) => {
-      a += b.properties.Over_Length;
-      return a;
-    }, 0);
 
-  way.properties.bridgeAmount = wayBridges
-    .filter(f => f.properties.type === 'bridge').length;
-
-  way.properties.culvertAmount = wayBridges
-    .filter(f => f.properties.type === 'culvert').length;
+  way.properties.bridges = wayBridges
+    .map(f => ({
+      'type': f.properties.type,
+      'length': f.properties.Over_Length
+    }))
 }
 
 function run (rnData) {

@@ -69,6 +69,7 @@ mkdir $TMP_DIR
 #       SURF_TYPE (String) - Example: Unpaved
 #       PAVE_WIDTH (String) - Example: 3.5m
 #       AVG_COND (String) - Example: Fair
+#       PROVINCE (String) - Example: Gaza
 #       AADT (Real) - average annual daily traffic Example: 70.000000
 #       RUC (Real) - Road User Cost per kilometer. Example: 0.112476
 #   - remove features that have no geometry
@@ -83,7 +84,7 @@ ogr2ogr $TMP_DIR/roadnetwork.shp "$RN_FILE" \
 
 ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp \
   -dialect sqlite \
-  -sql "SELECT NAME, ROAD_NAME, ROAD_ID, ROAD_CLASS, SURF_TYPE, PAVE_WIDTH, AVG_COND, AADT, RUC, geometry \
+  -sql "SELECT NAME, ROAD_NAME, ROAD_ID, ROAD_CLASS, SURF_TYPE, PAVE_WIDTH, AVG_COND, PROVINCE, AADT, RUC, geometry \
     FROM roadnetwork \
     WHERE geometry is not null" \
   -nln roadnetwork
@@ -208,9 +209,7 @@ echo "All done preparing the OD data."
 ###############################################################################
 #
 # 7. Add additional properties to each of the road segments:
-#   - bridgeAmount - total number of bridges on segment
-#   - bridgeLength - length of bridges on segment, in meters
-#   - culvertAmount - total number of culverts
+#   - bridges - an array with the bridges and culverts of the road
 #   - length - length of the road
 #   - provinceIso - ISO code of province the roads belongs to
 #
