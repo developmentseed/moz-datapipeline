@@ -107,6 +107,7 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp \
 #       Road_ID (String) - ID of the road the bridge/culvert is part of. Example: R0529
 #       Mat_Type (String) - material type Example: STEL
 #   - add/update the following properties:
+#     - make sure Over_Length is a number
 #     - add ID of the closest road
 #     - add a type (bridge / culvert) based on the name
 #     - add length of 7 in case there is no data on length

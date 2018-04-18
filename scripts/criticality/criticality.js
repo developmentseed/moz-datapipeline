@@ -22,11 +22,10 @@ import { runCmd, dataToCSV } from '../utils/utils';
 
 const { ROOT_DIR } = process.env;
 
-
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output')
+const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/criticality');
 

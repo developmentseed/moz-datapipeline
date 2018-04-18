@@ -8,7 +8,7 @@ import pointWithinPolygon from '@turf/points-within-polygon';
 import { point } from '@turf/helpers';
 import length from '@turf/length';
 
-import { prepTree, dataToCSV } from '../utils/utils';
+import { prepTree, dataToCSV, addScaledScore } from '../utils/utils';
 import { tStart, tEnd, initLog } from '../utils/logging';
 
 /**
@@ -134,12 +134,7 @@ async function run (ways, tree, indProperty) {
     };
   });
 
-  const maxWayValue = Math.max(...wayValues.map(w => w.value));
-
-  // Scale the values from 0-100
-  const wayScores = wayValues.map(w => ({ ...w, score: w.value / maxWayValue * 100 }));
-
-  const csv = await dataToCSV(wayScores);
+  const csv = await dataToCSV(addScaledScore(wayValues));
   return fs.writeFile(OUTPUT_INDICATOR_FILE, csv);
 }
 
