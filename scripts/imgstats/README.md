@@ -46,7 +46,7 @@ optional arguments:
 Now pass in the directory or s3 URI to a directory of raster files, along with the AOI. If the input directory is on s3, the final stats output file will be uploaded there.
 
 ```
-$ docker run --env-file .env -v $PWD/data:/work/data -it imgstats s3:/mozambique-road-planning/fluvial-pluvial/current --aoi data/roadnetwork.geojson --path data/
+$ docker run --env-file .env -v $PWD/data:/work/data -it imgstats s3:/mozambique-road-planning/fluvial-pluvial/current --aoi data/roadnetwork.geojson --path data/current
 ```
 
 The output stats file is named after the AOI. In this case it will be roadnetwork_stats.geojson

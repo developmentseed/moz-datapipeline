@@ -91,7 +91,7 @@ def get_stats(filenames, geom):
             poly_f.write(json.dumps(_geojson))
 
         # calculate stats
-        stats.append(zonal_stats(pfilename, f, stats="count min mean max", nodata=-9999)[0])
+        stats.append(zonal_stats(pfilename, f, stats="count min max", nodata=999)[0])
     return stats
 
 
@@ -123,26 +123,32 @@ def copy_files(filenames, path='/tmp'):
 
 def main(inputdir, aoi, path, id_property='NAME'):
     filenames = copy_files(find_files(inputdir), path=path)
-    copy_files(find_files(inputdir, ext='csv'), path=path)
-    fout = os.path.join(path, os.path.splitext(os.path.basename(aoi))[0] + '_stats.csv')
+    #copy_files(find_files(inputdir, ext='csv'), path=path)
+    fout = os.path.join(path, os.path.splitext(os.path.basename(aoi))[0] + '_stats.json')
     if not os.path.exists(fout):
         # calculate stats
         with open(str(aoi), 'r') as f:
             gj = json.loads(f.read())
         numfeatures = len(gj['features'])
-        f = open(fout, 'w')
-        f.write('fid, max' + '\n')
+
+        stats = {}
         print('Saving output to %s' % fout)
         for i, feat in enumerate(gj['features']):
             if feat['geometry'] is not None:
                 fid = feat['properties'][id_property]
                 print('Calculating stats for fid %s (%s of %s)' % (fid, i+1, numfeatures))
-                stats = get_stats(filenames, feat['geometry'])
-                maxval = max([s['max'] for s in stats])
+                _stats = []
+                for s in get_stats(filenames, feat['geometry']):
+                    if s['max'] == -9999 or s['max'] is None:
+                        _stats.append(0)
+                    else:
+                        _stats.append(s['max'])
+                keys = [os.path.basename(f).split('_')[3][3:] for f in filenames]
+                stats[fid] = dict(zip(keys, _stats))
                 #if maxval == 999 or maxval == -9999:
                 #    import pdb; pdb.set_trace()
-                f.write('%s,%s\n' % (fid, maxval))
-        f.close()
+        with open(fout, 'w') as f:
+            f.write(json.dumps(stats))
         # upload to s3
         if inputdir[0:5] == 's3://':
             upload(fout, inputdir)
