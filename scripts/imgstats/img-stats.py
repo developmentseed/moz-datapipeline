@@ -43,8 +43,10 @@ def upload(filename, uri, extra={}):
     s3_uri = uri_parser(uri)
     bname = os.path.basename(filename)
     uri_out = 's3://%s' % os.path.join(s3_uri['bucket'], os.path.join(s3_uri['key'], bname))
-    with open(filename, 'rb') as data:
-        s3.upload_fileobj(data, s3_uri['bucket'], os.path.join(s3_uri['key'], bname), ExtraArgs=extra)
+    key = os.path.join(s3_uri['key'], bname)
+    with open(filename, 'rb') as f:
+        #s3.upload_fileobj(f, s3_uri['bucket'], key, ExtraArgs=extra)
+        s3.put_object(Bucket=s3_uri['bucket'], Key=key, Body=f, ACL='public-read', ContentType='application/json')
     return uri_out
 
 
