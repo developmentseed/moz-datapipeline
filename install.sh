@@ -29,10 +29,6 @@ echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.lis
 apt-get update
 apt-get install -y yarn
 
-# Command line tools
-pip install csvkit
-pip install awscli --upgrade --user
-
 # Tippecanoe
 mkdir -p /tmp/tippecanoe-src
 cd /tmp/tippecanoe-src
