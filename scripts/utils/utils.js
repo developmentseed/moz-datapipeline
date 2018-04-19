@@ -131,7 +131,7 @@ export function addScaledScore (data) {
   const maxValue = Math.max(...data.map(w => w.value).filter(v => !isNaN(v)));
 
   // Scale values from 0-100
-  return data.map(w => ({ ...w, score: w.value / maxValue * 100 }));
+  return data.map(w => ({ ...w, score: round(w.value / maxValue * 100, 2) }));
 }
 
 // Sensible defaults for road properties

@@ -65,7 +65,7 @@ function addBridgeInfo (way) {
     .map(f => ({
       'type': f.properties.type,
       'length': f.properties.Over_Length
-    }))
+    }));
 }
 
 function addFloodInfo (way, floods) {
