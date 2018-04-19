@@ -210,6 +210,7 @@ echo "All done preparing the OD data."
 #
 # 7. Add additional properties to each of the road segments:
 #   - bridges - an array with the bridges and culverts of the road
+#   - floods - an array with max water levels for the road
 #   - length - length of the road
 #   - provinceIso - ISO code of province the roads belongs to
 #
