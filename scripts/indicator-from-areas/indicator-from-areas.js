@@ -8,7 +8,7 @@ import pointWithinPolygon from '@turf/points-within-polygon';
 import { point } from '@turf/helpers';
 import length from '@turf/length';
 
-import { prepTree, dataToCSV } from '../utils/utils';
+import { prepTree, dataToCSV, addScaledScore } from '../utils/utils';
 import { tStart, tEnd, initLog } from '../utils/logging';
 
 /**
@@ -43,10 +43,11 @@ if (!AREAS_FILE || !PROPERTY || !IND_NAME) {
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../.tmp');
+const OUTPUT_DIR = path.resolve(__dirname, '../../output');
+const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/indicator-from-areas');
 
-const RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork.geojson');
+const RN_FILE = path.resolve(TMP_DIR, 'roadnetwork.geojson');
 const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
@@ -66,7 +67,7 @@ const areasData = fs.readJsonSync(AREAS_FILE);
  * @return Promise{}            Resolves when file was written.
  */
 async function run (ways, tree, indProperty) {
-  const waysScore = ways.map((way, idx) => {
+  const wayValues = ways.map((way, idx) => {
     const id = `${idx + 1}/${ways.length}`;
     clog(`Handling way ${id}`);
     const wayBbox = bbox(way);
@@ -129,11 +130,11 @@ async function run (ways, tree, indProperty) {
 
     return {
       way_id: way.properties.NAME,
-      score: weightedIndicator
+      value: weightedIndicator
     };
   });
 
-  const csv = await dataToCSV(waysScore);
+  const csv = await dataToCSV(addScaledScore(wayValues));
   return fs.writeFile(OUTPUT_INDICATOR_FILE, csv);
 }
 
@@ -141,6 +142,7 @@ async function run (ways, tree, indProperty) {
   try {
     await Promise.all([
       fs.ensureDir(OUTPUT_DIR),
+      fs.ensureDir(TMP_DIR),
       fs.ensureDir(LOG_DIR)
     ]);
 

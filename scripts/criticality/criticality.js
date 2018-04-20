@@ -10,40 +10,28 @@ import { runCmd, dataToCSV } from '../utils/utils';
 /**
  * Performs the criticality analysis outputting the indicator score.
  *
+ * Required files:
+ * - od.geojson
+ * - roadnetwork-osm-ways.json
+ * - osrm/
+ *
  * Usage:
  *  $node ./scripts/criticality [source-dir]
  *
  */
 
-// This script requires 1 parameters.
-const [, , OUTPUT_DIR] = process.argv;
 const { ROOT_DIR } = process.env;
-
-if (!OUTPUT_DIR) {
-  console.log(`This script requires one parameters to run:
-  1. Directory where the source files are.
-
-  Required files:
-  - od.geojson
-  - roadnetwork-osm-ways.json
-  - osrm/
-
-  The resulting ways index will be saves as indicator-criticality.csv.
-  
-  Eg. $node ./scripts/criticality .tmp/`);
-
-  process.exit(1);
-}
 
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const TMP_DIR = path.resolve(__dirname, '../../.tmp/criticality');
+const OUTPUT_DIR = path.resolve(__dirname, '../../output');
+const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/criticality');
 
-const OD_FILE = path.resolve(OUTPUT_DIR, 'od.geojson');
-const WAYS_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork-osm-ways.json');
-const OSRM_FOLDER = path.resolve(OUTPUT_DIR, 'osrm');
+const OD_FILE = path.resolve(TMP_DIR, 'od.geojson');
+const WAYS_FILE = path.resolve(TMP_DIR, 'roadnetwork-osm-ways.json');
+const OSRM_FOLDER = path.resolve(TMP_DIR, 'osrm');
 
 const IND_NAME = 'criticality';
 const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
