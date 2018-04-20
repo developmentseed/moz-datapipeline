@@ -1,16 +1,18 @@
 'use strict';
 import fs from 'fs-extra';
+import fetch from 'node-fetch';
 import path from 'path';
 import Promise from 'bluebird';
 import length from '@turf/length';
 
 import { tStart, tEnd, initLog } from '../utils/logging';
+import { round } from '../utils/utils';
 
 /**
  * Include additional properties on the Road Network:
  * - Province the road runs through
  * - Road length
- * - Number of bridges and culverts
+ * - Bridges and culverts
  *
  * Required files:
  * - roadnetwork.geojson
@@ -38,13 +40,16 @@ clog('Loading province boundaries');
 const provBoundaries = fs.readJsonSync(BOUND_FILES);
 clog('Loading bridge and culvert data');
 const bridgeData = fs.readJsonSync(BRIDGE_FILE);
+
+const FLOOD_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats.json';
+
 clog('Loading road network');
 // rnData will be modified by the functions.
 var rnData = fs.readJsonSync(RN_FILE);
 
 function addWayLength (way) {
   // Add length
-  way.properties.length = length(way);
+  way.properties.length = round(length(way));
 }
 
 function addWayProvince (way) {
@@ -55,25 +60,29 @@ function addWayProvince (way) {
 
 function addBridgeInfo (way) {
   const wayBridges = bridgeData.features.filter(f => f.properties.roadSegmentID === way.properties.NAME);
-  way.properties.bridgeLength = wayBridges
-    .filter(f => f.properties.type === 'bridge')
-    .reduce((a, b) => {
-      a += b.properties.Over_Length;
-      return a;
-    }, 0);
 
-  way.properties.bridgeAmount = wayBridges
-    .filter(f => f.properties.type === 'bridge').length;
-
-  way.properties.culvertAmount = wayBridges
-    .filter(f => f.properties.type === 'culvert').length;
+  way.properties.bridges = wayBridges
+    .map(f => ({
+      'type': f.properties.type,
+      'length': f.properties.Over_Length
+    }));
 }
 
-function run (rnData) {
+function addFloodInfo (way, floods) {
+  const wayFloods = floods[way.properties.NAME];
+
+  // The return periods of the flood data
+  const returnPeriods = [ 5, 10, 20, 50, 75, 100, 200, 250, 500, 1000 ];
+
+  way.properties.floods = returnPeriods.map(r => round(wayFloods[r]));
+}
+
+function run (rnData, floods) {
   rnData.features.forEach(way => {
     addWayLength(way);
     addWayProvince(way);
     addBridgeInfo(way);
+    addFloodInfo(way, floods);
   });
 
   return rnData;
@@ -86,8 +95,10 @@ function run (rnData) {
       fs.ensureDir(LOG_DIR)
     ]);
 
+    const floods = await fetch(FLOOD_FILE).then(res => res.json());
+
     tStart(`Total run time`)();
-    const data = run(rnData);
+    const data = run(rnData, floods);
 
     fs.writeJsonSync(RN_FILE, data);
     tEnd(`Total run time`)();
