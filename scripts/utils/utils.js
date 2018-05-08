@@ -1,11 +1,13 @@
 'use strict';
 import fs from 'fs-extra';
+import path from 'path';
 import Promise from 'bluebird';
 import { spawn } from 'child_process';
 import bbox from '@turf/bbox';
 import rbush from 'rbush';
 import csvStringify from 'csv-stringify';
 
+import { tStart, tEnd } from './logging';
 /**
  * Tap into a promise and run the given function.
  * If the fn is a promise it will wait for it to resolve.
@@ -151,4 +153,101 @@ export function getRoadCondition (road) {
   let avgCond = road.properties.AVG_COND.toLowerCase();
   if (avgCond === 'very poor' || avgCond === 'n/a') return 'poor';
   return avgCond;
+}
+
+/**
+ * Create a speed profile file with all the node pairs on the RN and the max
+ * speed set to 0
+ *
+ * @param  {String} speedProfileFile Path to speed profile.
+ * @param  {Array} ways              Ways to write profile for.
+ *
+ * @return Promise{}                 Resolves when file was written.
+ */
+export function createSpeedProfile (speedProfileFile, ways) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(speedProfileFile);
+
+    file
+      .on('open', () => {
+        // Compute traffic profile.
+        // https://github.com/Project-OSRM/osrm-backend/wiki/Traffic
+        ways.forEach((way, idx) => {
+          if (idx !== 0) { file.write('\n'); }
+          for (let i = 0; i < way.nodes.length - 2; i++) {
+            if (i !== 0) { file.write('\n'); }
+
+            const node = way.nodes[i];
+            const nextNode = way.nodes[i + 1];
+
+            file.write(`${node},${nextNode},0\n`);
+            file.write(`${nextNode},${node},0`);
+          }
+        });
+        file.end();
+      })
+      .on('error', err => reject(err))
+      .on('finish', () => resolve());
+  });
+}
+
+/**
+ * Ignores givem segments from the RN network by setting the max travel speed
+ * between all the nodes on that segments to 0.
+ * Steps:
+ * - Calls createSpeedProfile()
+ * - Run osrm-contract on the osrm files using the created speed profile.
+ *
+ * @uses createSpeedProfile()
+ * @uses tStart()
+ * @uses tEnd()
+ *
+ * @param  {object} ways        Way being ignored.
+ * @param  {string} osrmFolder  Path to osrm folder
+ * @param  {string} processId   Identifier for this process.
+ * @param  {object} options     Additional options.
+ *                                TMP_DIR: Path to the temporary folder.
+ *                                ROOT_DIR: Path to the root folder. (optional)
+ *                                LOG_DIR: Path to the log folder.
+ *
+ * @return {Promise}           Resolves with no data.
+ */
+export async function ignoreWays (ways, osrmFolder, processId, opts = {}) {
+  const mandatoryOpts = ['TMP_DIR', 'LOG_DIR'];
+  mandatoryOpts.forEach(o => {
+    if (!opts[o]) throw new Error(`Missing option: ${o}`);
+  });
+
+  const { TMP_DIR, ROOT_DIR, LOG_DIR } = opts;
+  const speedProfileFile = `${TMP_DIR}/speed-${processId}.csv`;
+  await createSpeedProfile(speedProfileFile, ways);
+
+  const rootPath = path.resolve(__dirname, '../..');
+  // The dockerVolMount depends on whether we're running this from another docker
+  // container or directly. See docker-compose.yml for an explanantion.
+  const dockerVolMount = ROOT_DIR || rootPath;
+
+  // Paths for the files depending from where this is being run.
+  const pathOSRM = ROOT_DIR ? osrmFolder.replace(rootPath, ROOT_DIR) : osrmFolder;
+  const pathSpeedProf = ROOT_DIR ? speedProfileFile.replace(rootPath, ROOT_DIR) : speedProfileFile;
+
+  tStart(`[IGNORE WAYS] ${processId} traffic profile`)();
+  await createSpeedProfile(speedProfileFile, ways);
+  tEnd(`[IGNORE WAYS] ${processId} traffic profile`)();
+
+  tStart(`[IGNORE WAYS] ${processId} osm-contract`)();
+  await runCmd('docker', [
+    'run',
+    '--rm',
+    '-t',
+    '-v', `${dockerVolMount}:${dockerVolMount}`,
+    'osrm/osrm-backend:v5.16.4',
+    'osrm-contract',
+    '--segment-speed-file', pathSpeedProf,
+    `${pathOSRM}/roadnetwork.osrm`
+  ], {}, `${LOG_DIR}/osm-contract-logs/${processId}.log`);
+  tEnd(`[IGNORE WAYS] ${processId} osm-contract`)();
+
+  // Speed profile file is no longer needed.
+  fs.remove(speedProfileFile);
 }
