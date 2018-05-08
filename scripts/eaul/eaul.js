@@ -48,7 +48,13 @@ waysList.forEach(w => {
 });
 tEnd(`Create lookup tables`)();
 
-const FLOOD_EVENTS = [10, 20, 50, 100];
+const FLOOD_RETURN_PERIOD = [10, 20, 50, 100];
+const FLOOD_REPAIR_TIME = {
+  10: 10,
+  20: 20,
+  50: 50,
+  100: 100
+};
 
 // jsonToFile(`${TMP_DIR}/node-ways.index.json`)(nodeWayLookup);
 
@@ -68,59 +74,97 @@ function osrmRoute (osrm, opts) {
 }
 
 async function getImpassableWays () {
-  return [waysList[0]];
+  // TODO: Implement
+  return waysList.slice(0, 100);
 }
 
+let floodOSRMFiles = {
+  // event : osrm path
+};
+/**
+ * Creates a osrm file for each return period ignoring the segments that
+ * get flooded on that return period.
+ *
+ * @param {string} osrmFolder Path to the baseline OSRM
+ *
+ * @returns Promise, but caches the osrm file paths in var `floodOSRMFiles`
+ */
 async function prepareFloodOSRMFiles (osrmFolder) {
-  const floodOSRM = {
-    // event : osrm path
-  };
+  return Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
+    const impassableWays = await getImpassableWays(retPeriod);
 
-  await Promise.map(FLOOD_EVENTS, async (event) => {
-    const impassableWays = await getImpassableWays(event);
-
-    const osrmFolderName = `osrm-flood-${event}`;
+    const osrmFolderName = `osrm-flood-${retPeriod}`;
     const osrmFolder = `${TMP_DIR}/${osrmFolderName}`;
 
-    tStart(`[IGNORE WAYS] ${event} clean`)();
+    tStart(`[IGNORE WAYS] ${retPeriod} clean`)();
     await fs.copy(OSRM_FOLDER, osrmFolder);
-    tEnd(`[IGNORE WAYS] ${event} clean`)();
+    tEnd(`[IGNORE WAYS] ${retPeriod} clean`)();
 
-    await ignoreWays(impassableWays, osrmFolder, event, {TMP_DIR, ROOT_DIR, LOG_DIR});
-    floodOSRM[event] = osrmFolder;
+    await ignoreWays(impassableWays, osrmFolder, retPeriod, {TMP_DIR, ROOT_DIR, LOG_DIR});
+    floodOSRMFiles[retPeriod] = osrmFolder;
   }, {concurrency: 5});
+}
 
-  return floodOSRM;
+/**
+ * Return the osrm file path for a given return period.
+ * @param {number} retPeriod Return period for which to get osrm file path.
+ */
+function getFloodOSRMFile (retPeriod) {
+  if (!floodOSRMFiles[retPeriod]) {
+    throw new Error(`Flood osrm file missing for return period ${retPeriod}. Have you run prepareFloodOSRMFiles()?`);
+  }
+  return floodOSRMFiles[retPeriod];
 }
 
 async function run (odPairs) {
-  // OSRM file per flood event.
-  // const floodOSRM = await prepareFloodOSRMFiles();
+  // OSRM file per flood return period.
+  await prepareFloodOSRMFiles();
 
   // For each od api combination.
+  let eaul = 0;
   const totalOD = odPairs.length;
   for (let oidx = 0; oidx <= totalOD - 2; oidx++) {
     const origin = odPairs[oidx];
     for (let didx = oidx + 1; didx < totalOD; didx++) {
       const destination = odPairs[didx];
-
       clog('origin', origin);
       clog('destination', destination);
-      const odPairRUC = await calcRUC(OSRM_FOLDER, origin, destination);
-      clog(`RUC ${origin.properties.Name} - ${destination.properties.Name}`, odPairRUC);
-
-      // FLOOD_EVENTS.forEach(event => {
-      //   const floodedODPairRUC = await calcRUC(floodOSRM[event], origin, destination);
-      // })
-
-
-
-
-
+      // Calculate EAUL (Expected Annual User Loss) for this OD pair.
+      const odPairEaul = await calcEaul(origin, destination);
+      clog('odPairEaul', odPairEaul);
       clog('--------');
       clog('');
+      eaul += odPairEaul;
     }
   }
+  clog('eaul', eaul);
+}
+
+async function calcEaul (origin, destination) {
+  // Calculate baseline RUC for this OD pair.
+  // Using road network with no disruptions.
+  const odPairRUC = await calcRUC(OSRM_FOLDER, origin, destination);
+  clog(`RUC ${origin.properties.Name} - ${destination.properties.Name}`, odPairRUC);
+
+  // Calculate RUC on a flooded RN depending on the flood return period.
+  const increaseUCost = await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
+    const floodOSRM = getFloodOSRMFile(retPeriod);
+    const ruc = await calcRUC(floodOSRM, origin, destination);
+    // TODO: Add od pair traffic.
+    return FLOOD_REPAIR_TIME[retPeriod] * (ruc - odPairRUC) * 1;
+  }, {concurrency: 5});
+
+  clog('increased user cost', increaseUCost);
+
+  // Calculate the EAUL from the increased user cost using the trapezoidal rule.
+  let sum = 0;
+  const t = FLOOD_RETURN_PERIOD;
+  const u = increaseUCost;
+  for (let i = 0; i <= t.length - 2; i++) {
+    sum += (1 / t[i] - 1 / t[i + 1]) * (u[i] + u[i + 1]);
+  }
+
+  return sum ? sum / 2 : 0;
 }
 
 async function calcRUC (osrmFolder, origin, destination) {
@@ -131,19 +175,12 @@ async function calcRUC (osrmFolder, origin, destination) {
   ];
 
   const result = await osrmRoute(osrm, {coordinates, annotations: ['nodes']});
-  // Get the ways used by this route.
-  const routeNodes = result.routes[0].legs[0].annotation.nodes;
-  const usedWays = getWaysForRoute(routeNodes);
+  // Through the osrm speed profile we set the speed to be 1/ruc.
+  // By doing so, the total time (in hours) will be cost of the kms travelled.
+  const ruc = result.routes[0].legs[0].duration / 3600;
+
   jsonToFile(`${LOG_DIR}/result-${origin.properties.Name}-${destination.properties.Name}.json`)(result);
-  jsonToFile(`${LOG_DIR}/usedWays-${origin.properties.Name}-${destination.properties.Name}.json`)(usedWays);
-
-  const routeRUC = usedWays.reduce((acc, way) => {
-    const ruc = parseFloat(way.tags.RUC);
-    const kms = parseFloat(way.tags.Length) / 1000;
-    return acc + ruc * kms;
-  }, 0);
-
-  return routeRUC;
+  return ruc;
 }
 
 /**
@@ -162,7 +199,7 @@ function getWaysForRoute (nodes) {
   // This index stores the index of a node for a given way so when we find
   // another node for the same way, we can know if it is sequential or not.
   let usedWaysIdx = {
-    // wayId: node position
+    // wayId: {min node position, max node position}
   };
 
   tStart(`Node search`)();
@@ -180,25 +217,29 @@ function getWaysForRoute (nodes) {
       const prevNodeIdxInWay = usedWaysIdx[wid];
 
       if (prevNodeIdxInWay === undefined) {
-        // First time way appears. Store node index.
-        usedWaysIdx[way.id] = nodeIdxInWay;
+        // First time way appears. Store node indexes.
+        usedWaysIdx[way.id] = {min: nodeIdxInWay, max: nodeIdxInWay};
         return;
       }
 
-      if (prevNodeIdxInWay === true) {
-        // The way was already validated. Nothing to do.
-        return;
-      }
-
-      // There is a previous Id. Check if the nodes are sequential.
-      if (nodeIdxInWay === prevNodeIdxInWay - 1 || nodeIdxInWay === prevNodeIdxInWay + 1) {
-        // Way is valid.
-        usedWaysIdx[way.id] = true;
-        usedWays.push(way);
+      const { min, max } = usedWaysIdx[way.id];
+      // There is a previous index stored. Check if the nodes are sequential.
+      if (nodeIdxInWay === min - 1 || nodeIdxInWay === max + 1) {
+        // Way is valid. If the nodes have the same value means that the way
+        // was not stored yet.
+        if (min === max) usedWays.push(way);
+        // Update min and max.
+        usedWaysIdx[way.id] = {
+          min: Math.min(min, nodeIdxInWay),
+          max: Math.max(max, nodeIdxInWay)
+        };
       }
     });
   });
   tEnd(`Node search`)();
+
+  clog(usedWaysIdx);
+  clog(usedWays.map(w => w.id));
 
   return usedWays;
 }
@@ -218,5 +259,6 @@ function getWaysForRoute (nodes) {
     tEnd(`Total run time`)();
   } catch (e) {
     console.log(e);
+    process.exit(1);
   }
 }());
