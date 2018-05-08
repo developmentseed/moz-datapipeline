@@ -3,16 +3,25 @@ import fs from 'fs-extra';
 import Promise from 'bluebird';
 import nodeCleanup from 'node-cleanup';
 
-export function initLog (logfile) {
-  // Store all the logs to write them to a file on exit.
-  var logData = [];
+export function initLog (logfilePath) {
+  // File stream.
+  const logfile = fs.createWriteStream(logfilePath);
   const clog = (...args) => {
-    logData.push(args.join(' '));
     console.log(...args);
+    const data = args.reduce((acc, arg) => {
+      if (typeof arg === 'object') {
+        arg = JSON.stringify(arg, null, '\t');
+      }
+      return acc + arg + ' ';
+    }, '');
+
+    logfile.write(data);
+    logfile.write('\n');
   };
-  // Write logging to file.
+  // Close the stream
   nodeCleanup(function (exitCode, signal) {
-    fs.writeFileSync(logfile, logData.join('\n'));
+    logfile.write(`Code: ${exitCode}\n`);
+    logfile.end(`Signal ${signal}`);
   });
 
   return clog;
