@@ -156,32 +156,36 @@ export function getRoadCondition (road) {
 }
 
 /**
- * Create a speed profile file with all the node pairs on the RN and the max
- * speed set to 0
+ * Creates or updates a speed profile file with all the node pairs of the given
+ * ways set to speed.
  *
  * @param  {String} speedProfileFile Path to speed profile.
  * @param  {Array} ways              Ways to write profile for.
+ * @param  {number} speed            The speed to set for the node pair.
+ * @param  {boolean} append          Whether the data is going to be appended
+ *                                   to the file. Used to ensure that a line
+ *                                   break is added to the file.
  *
  * @return Promise{}                 Resolves when file was written.
  */
-export function createSpeedProfile (speedProfileFile, ways) {
+export function createSpeedProfile (speedProfileFile, ways, speed = 0, append = false) {
   return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(speedProfileFile);
+    const file = fs.createWriteStream(speedProfileFile, {flags: 'a'});
 
     file
       .on('open', () => {
         // Compute traffic profile.
         // https://github.com/Project-OSRM/osrm-backend/wiki/Traffic
         ways.forEach((way, idx) => {
-          if (idx !== 0) { file.write('\n'); }
+          if (idx !== 0 || append) { file.write('\n'); }
           for (let i = 0; i < way.nodes.length - 2; i++) {
             if (i !== 0) { file.write('\n'); }
 
             const node = way.nodes[i];
             const nextNode = way.nodes[i + 1];
 
-            file.write(`${node},${nextNode},0\n`);
-            file.write(`${nextNode},${node},0`);
+            file.write(`${node},${nextNode},${speed}\n`);
+            file.write(`${nextNode},${node},${speed}`);
           }
         });
         file.end();
@@ -218,10 +222,23 @@ export async function ignoreWays (ways, osrmFolder, processId, opts = {}) {
     if (!opts[o]) throw new Error(`Missing option: ${o}`);
   });
 
-  const { TMP_DIR, ROOT_DIR, LOG_DIR } = opts;
+  const { TMP_DIR } = opts;
   const speedProfileFile = `${TMP_DIR}/speed-${processId}.csv`;
-  await createSpeedProfile(speedProfileFile, ways);
 
+  tStart(`[IGNORE WAYS] ${processId} traffic profile`)();
+  await createSpeedProfile(speedProfileFile, ways);
+  tEnd(`[IGNORE WAYS] ${processId} traffic profile`)();
+
+  tStart(`[IGNORE WAYS] ${processId} osm-contract`)();
+  await osrmContract(osrmFolder, speedProfileFile, processId, opts);
+  tEnd(`[IGNORE WAYS] ${processId} osm-contract`)();
+
+  // Speed profile file is no longer needed.
+  fs.remove(speedProfileFile);
+}
+
+export async function osrmContract (osrmFolder, speedProfileFile, processId, opts = {}) {
+  const { ROOT_DIR, LOG_DIR } = opts;
   const rootPath = path.resolve(__dirname, '../..');
   // The dockerVolMount depends on whether we're running this from another docker
   // container or directly. See docker-compose.yml for an explanantion.
@@ -231,11 +248,6 @@ export async function ignoreWays (ways, osrmFolder, processId, opts = {}) {
   const pathOSRM = ROOT_DIR ? osrmFolder.replace(rootPath, ROOT_DIR) : osrmFolder;
   const pathSpeedProf = ROOT_DIR ? speedProfileFile.replace(rootPath, ROOT_DIR) : speedProfileFile;
 
-  tStart(`[IGNORE WAYS] ${processId} traffic profile`)();
-  await createSpeedProfile(speedProfileFile, ways);
-  tEnd(`[IGNORE WAYS] ${processId} traffic profile`)();
-
-  tStart(`[IGNORE WAYS] ${processId} osm-contract`)();
   await runCmd('docker', [
     'run',
     '--rm',
@@ -246,8 +258,31 @@ export async function ignoreWays (ways, osrmFolder, processId, opts = {}) {
     '--segment-speed-file', pathSpeedProf,
     `${pathOSRM}/roadnetwork.osrm`
   ], {}, `${LOG_DIR}/osm-contract-logs/${processId}.log`);
-  tEnd(`[IGNORE WAYS] ${processId} osm-contract`)();
+}
 
-  // Speed profile file is no longer needed.
-  fs.remove(speedProfileFile);
+/**
+ * Loops over the given array executing the callback for every combination of
+ * array values. Example:
+ * [1,2,3,4] would result in:
+ *   1,2 | 1,3 | 1,4 | 2,3 | 2,4 | 3,4
+ * The number of executions is given by:
+ *   Array length * (Array length - 1) / 2
+ *
+ * Returning false from the callback will stop the execution.
+ *
+ * @param {array} array The array over which to iterate.
+ * @param {function} cb Callback function to execute on every iteration.
+ *                      Signature is cb(valA:mixed, valB:mixed, idxA:int, idxB:int, all:array)
+ */
+export async function forEachArrayCombination (array, cb) {
+  const len = array.length;
+  for (let aidx = 0; aidx <= len - 2; aidx++) {
+    const a = array[aidx];
+    for (let bidx = aidx + 1; bidx < len; bidx++) {
+      const b = array[bidx];
+      const res = await cb(a, b, aidx, bidx, array);
+      // A false return value stops execution.
+      if (res === false) return;
+    }
+  }
 }

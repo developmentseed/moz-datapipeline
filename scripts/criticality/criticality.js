@@ -5,7 +5,7 @@ import Promise from 'bluebird';
 import OSRM from 'osrm';
 
 import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
-import { dataToCSV, ignoreWays } from '../utils/utils';
+import { dataToCSV, createSpeedProfile, osrmContract } from '../utils/utils';
 
 /**
  * Performs the criticality analysis outputting the indicator score.
@@ -203,7 +203,18 @@ async function calcTimePenaltyForWay (way, coords, benchmark) {
   await fs.copy(OSRM_FOLDER, `${TMP_DIR}/${osrmFolder}`);
   tEnd(`WAY ${way.id} clean`)();
 
-  await ignoreWays([way], `${TMP_DIR}/${osrmFolder}`, way.id, {TMP_DIR, ROOT_DIR, LOG_DIR});
+  const speedProfileFile = `${TMP_DIR}/speed-${way.id}.csv`;
+
+  tStart(`[IGNORE WAYS] ${way.id} traffic profile`)();
+  await createSpeedProfile(speedProfileFile, [way]);
+  tEnd(`[IGNORE WAYS] ${way.id} traffic profile`)();
+
+  tStart(`[IGNORE WAYS] ${way.id} osm-contract`)();
+  await osrmContract(`${TMP_DIR}/${osrmFolder}`, speedProfileFile, way.id, {ROOT_DIR, LOG_DIR});
+  tEnd(`[IGNORE WAYS] ${way.id} osm-contract`)();
+
+  // Speed profile file is no longer needed.
+  fs.remove(speedProfileFile);
 
   tStart(`WAY ${way.id} osrm-table`)();
   const result = await osrmTable(`${TMP_DIR}/${osrmFolder}/roadnetwork.osrm`, {coordinates: coords}, way);
