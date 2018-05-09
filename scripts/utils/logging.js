@@ -1,9 +1,11 @@
 'use strict';
 import fs from 'fs-extra';
+import path from 'path';
 import Promise from 'bluebird';
 import nodeCleanup from 'node-cleanup';
 
 export function initLog (logfilePath) {
+  fs.ensureDirSync(path.dirname(logfilePath));
   // File stream.
   const logfile = fs.createWriteStream(logfilePath);
   const clog = (...args) => {
