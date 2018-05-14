@@ -20,7 +20,7 @@
     "@turf/bbox": "^5.1.5",
     "@turf/buffer": "^5.1.5",
     "@turf/intersect": "^5.1.6",
-    "@turf/length": "^5.1.5",
+    "@turf/length": "^6.0.2",
     "@turf/line-split": "^5.1.5",
     "@turf/turf": "^5.1.6",
     "babel-plugin-syntax-async-functions": "^6.13.0",

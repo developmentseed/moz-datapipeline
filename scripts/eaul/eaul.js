@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import Promise from 'bluebird';
 import OSRM from 'osrm';
+import tLen from '@turf/length';
 
 import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
 import { createSpeedProfile, osrmContract, forEachArrayCombination } from '../utils/utils';
@@ -19,6 +20,7 @@ const LOG_DIR = path.resolve(__dirname, '../../log/eaul');
 const OD_FILE = path.resolve(TMP_DIR, 'od-mini.geojson');
 const OSRM_FOLDER = path.resolve(TMP_DIR, 'osrm');
 const WAYS_FILE = path.resolve(TMP_DIR, 'roadnetwork-osm-ways.json');
+const NODES_FILE = path.resolve(TMP_DIR, 'rn-nodes.index.json');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -26,6 +28,7 @@ clog('Using OD Pairs', OD_FILE);
 clog('Using RN Ways', WAYS_FILE);
 const odPairs = fs.readJsonSync(OD_FILE);
 var waysList = fs.readJsonSync(WAYS_FILE);
+var nodesList = fs.readJsonSync(NODES_FILE);
 
 tStart(`Create lookup tables`)();
 // Create lookup tables.
@@ -47,6 +50,119 @@ waysList.forEach(w => {
 });
 tEnd(`Create lookup tables`)();
 
+/**
+ * Returns the ways used on a given route composed by the input nodes.
+ * There must be a way connecting the nodes otherwise the route is not valid.
+ *
+ * @param {Array} nodes
+ */
+function getWaysForRoute (usedNodes) {
+  // This index stores the sequential nodes used for each way. This will be used
+  // to calculate how much of the way was actually used.
+  let usedWaysIdx = {
+  // wayId: {
+  //   id
+  //   segments: []
+  // }
+  };
+
+  tStart(`Node search`)();
+  for (let usedNodeIdx = 0; usedNodeIdx < usedNodes.length; usedNodeIdx++) {
+    const node = usedNodes[usedNodeIdx].toString();
+
+    const waysForNode = nodeWayLookup[node];
+
+    // A node may belong to several ways, but only one way will have multiple
+    // nodes that make up the route. This way will update the usedNodeIdx to
+    // continue the search, but we need the original value for all the cycle
+    // iteraions.
+    let usedNodeIdxUpdate = usedNodeIdx;
+    waysForNode.forEach(wayId => {
+      const way = waysLookup[wayId];
+
+      // Where is this node in the way?
+      let currNodeIdx = way.nodes.indexOf(node);
+
+      // See the direction of the routing. If needed, reverse the way nodes.
+      // Use the next node to check this.
+      const nextNode = (usedNodes[usedNodeIdx + 1] || '').toString();
+      const nextWayNode = way.nodes[currNodeIdx + 1];
+      const prevWayNode = way.nodes[currNodeIdx - 1];
+
+      const wayNodesCopy = [...way.nodes];
+      let reversed = false;
+      if (nextNode !== nextWayNode && nextNode !== prevWayNode) {
+        // Nothing to do.
+        return;
+      } else if (nextNode === prevWayNode) {
+        // Reverse way nodes, to loop.
+        wayNodesCopy.reverse();
+        currNodeIdx = wayNodesCopy.indexOf(node);
+        reversed = true;
+      }
+
+      let nodesInWay = [node];
+      // Since the nodes are sequential see which ones belong.
+      let nextNodeIdx = usedNodeIdx + 1;
+      for (nextNodeIdx; nextNodeIdx < usedNodes.length; nextNodeIdx++) {
+        const nextNode = usedNodes[nextNodeIdx].toString();
+
+        if (wayNodesCopy[++currNodeIdx] === nextNode) {
+          nodesInWay.push(nextNode);
+        } else {
+          // Way was interrupted. Stop.
+          break;
+        }
+      }
+      // Once the last node was found, continue from the previous one
+      // because the ways share the connected nodes. We need to subtract 2
+      // because the loop will advance the index.
+      usedNodeIdxUpdate = nextNodeIdx - 2;
+
+      if (reversed) nodesInWay.reverse();
+
+      if (!usedWaysIdx[wayId]) {
+        usedWaysIdx[wayId] = {
+          id: wayId,
+          segments: [
+            nodesInWay
+          ]
+        };
+      } else {
+        usedWaysIdx[wayId].segments.push(nodesInWay);
+      }
+    });
+
+    // Update with new value.
+    usedNodeIdx = usedNodeIdxUpdate;
+  }
+  tEnd(`Node search`)();
+
+  tStart(`len calc`)();
+  for (const wayId in usedWaysIdx) {
+    const segments = usedWaysIdx[wayId].segments;
+
+    const usedLength = segments.reduce((acc, nodes) => {
+      let feat = {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: nodes.map(nid => ([
+            nodesList[nid].lon,
+            nodesList[nid].lat
+          ]))
+        }
+      };
+      return acc + tLen(feat);
+    }, 0);
+
+    usedWaysIdx[wayId].usedLength = usedLength;
+  }
+  tEnd(`len calc`)();
+
+  return usedWaysIdx;
+}
+
 const FLOOD_RETURN_PERIOD = [10, 20, 50, 100];
 const FLOOD_REPAIR_TIME = {
   10: 10,
@@ -61,13 +177,21 @@ const ROAD_UPGRADES = [
   'three'
 ];
 
-// jsonToFile(`${TMP_DIR}/node-ways.index.json`)(nodeWayLookup);
+async function getImpassableWays () {
+  // TODO: Implement
+  return waysList.slice(0, 100);
+}
+
+async function getUpgradeWaySpeed () {
+  // TODO: Implement
+  return Math.round(1 / 0.004 * 10000);
+}
 
 /**
  * Promise version of osrm.route()
  *
  * @param {osrm} osrm The OSRM instance.
- * @param {object} opts Options to pass to the route method
+ * @param {object} opts Options to pass to the route method.
  */
 function osrmRoute (osrm, opts) {
   return new Promise((resolve, reject) => {
@@ -78,18 +202,10 @@ function osrmRoute (osrm, opts) {
   });
 }
 
-async function getImpassableWays () {
-  // TODO: Implement
-  return waysList.slice(0, 100);
-}
-
-async function getUpgradeWaySpeed () {
-  // TODO: Implement
-  return 40;
 }
 
 let floodOSRMFiles = {
-  // event : osrm path
+  // event: osrm path
 };
 /**
  * Creates a osrm file for each return period ignoring the segments that
@@ -208,7 +324,7 @@ async function calcRUC (osrmFolder, origin, destination) {
   const result = await osrmRoute(osrm, {coordinates, annotations: ['nodes']});
   // Through the osrm speed profile we set the speed to be 1/ruc.
   // By doing so, the total time (in hours) will be cost of the kms travelled.
-  const ruc = result.routes[0].legs[0].duration / 3600;
+  const ruc = result.routes[0].legs[0].duration / 3600 * 10000;
 
   jsonToFile(`${LOG_DIR}/result-${origin.properties.Name}-${destination.properties.Name}.json`)(result);
   return ruc;
@@ -228,8 +344,10 @@ async function run (odPairs) {
   await forEachArrayCombination(odPairs, async (origin, destination) => {
     clog('origin', origin);
     clog('destination', destination);
+    tStart('EAUL od pair')();
     // Calculate EAUL (Expected Annual User Loss) for this OD pair.
     const odPairEaul = await calcEaul(OSRM_FOLDER, origin, destination);
+    tEnd('EAUL od pair')();
     clog('odPairEaul', odPairEaul);
     clog('--------');
     clog('');
