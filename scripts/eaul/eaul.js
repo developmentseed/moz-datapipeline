@@ -3,10 +3,9 @@ import fs from 'fs-extra';
 import path from 'path';
 import Promise from 'bluebird';
 import OSRM from 'osrm';
-import tLen from '@turf/length';
 
 import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
-import { createSpeedProfile, osrmContract, forEachArrayCombination } from '../utils/utils';
+import { createSpeedProfile, osrmContract } from '../utils/utils';
 
 const { ROOT_DIR } = process.env;
 
@@ -20,7 +19,6 @@ const LOG_DIR = path.resolve(__dirname, '../../log/eaul');
 const OD_FILE = path.resolve(TMP_DIR, 'od-mini.geojson');
 const OSRM_FOLDER = path.resolve(TMP_DIR, 'osrm');
 const WAYS_FILE = path.resolve(TMP_DIR, 'roadnetwork-osm-ways.json');
-const NODES_FILE = path.resolve(TMP_DIR, 'rn-nodes.index.json');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -28,140 +26,6 @@ clog('Using OD Pairs', OD_FILE);
 clog('Using RN Ways', WAYS_FILE);
 const odPairs = fs.readJsonSync(OD_FILE);
 var waysList = fs.readJsonSync(WAYS_FILE);
-var nodesList = fs.readJsonSync(NODES_FILE);
-
-tStart(`Create lookup tables`)();
-// Create lookup tables.
-var nodeWayLookup = {
-  // nodeId: [wayId, wayId, ...]
-};
-var waysLookup = {
-  // wayId: way
-};
-waysList.forEach(w => {
-  waysLookup[w.id] = w;
-  w.nodes.forEach(n => {
-    if (nodeWayLookup[n]) {
-      nodeWayLookup[n].push(w.id);
-    } else {
-      nodeWayLookup[n] = [w.id];
-    }
-  });
-});
-tEnd(`Create lookup tables`)();
-
-/**
- * Returns the ways used on a given route composed by the input nodes.
- * There must be a way connecting the nodes otherwise the route is not valid.
- *
- * @param {Array} nodes
- */
-function getWaysForRoute (usedNodes) {
-  // This index stores the sequential nodes used for each way. This will be used
-  // to calculate how much of the way was actually used.
-  let usedWaysIdx = {
-  // wayId: {
-  //   id
-  //   segments: []
-  // }
-  };
-
-  tStart(`Node search`)();
-  for (let usedNodeIdx = 0; usedNodeIdx < usedNodes.length; usedNodeIdx++) {
-    const node = usedNodes[usedNodeIdx].toString();
-
-    const waysForNode = nodeWayLookup[node];
-
-    // A node may belong to several ways, but only one way will have multiple
-    // nodes that make up the route. This way will update the usedNodeIdx to
-    // continue the search, but we need the original value for all the cycle
-    // iteraions.
-    let usedNodeIdxUpdate = usedNodeIdx;
-    waysForNode.forEach(wayId => {
-      const way = waysLookup[wayId];
-
-      // Where is this node in the way?
-      let currNodeIdx = way.nodes.indexOf(node);
-
-      // See the direction of the routing. If needed, reverse the way nodes.
-      // Use the next node to check this.
-      const nextNode = (usedNodes[usedNodeIdx + 1] || '').toString();
-      const nextWayNode = way.nodes[currNodeIdx + 1];
-      const prevWayNode = way.nodes[currNodeIdx - 1];
-
-      const wayNodesCopy = [...way.nodes];
-      let reversed = false;
-      if (nextNode !== nextWayNode && nextNode !== prevWayNode) {
-        // Nothing to do.
-        return;
-      } else if (nextNode === prevWayNode) {
-        // Reverse way nodes, to loop.
-        wayNodesCopy.reverse();
-        currNodeIdx = wayNodesCopy.indexOf(node);
-        reversed = true;
-      }
-
-      let nodesInWay = [node];
-      // Since the nodes are sequential see which ones belong.
-      let nextNodeIdx = usedNodeIdx + 1;
-      for (nextNodeIdx; nextNodeIdx < usedNodes.length; nextNodeIdx++) {
-        const nextNode = usedNodes[nextNodeIdx].toString();
-
-        if (wayNodesCopy[++currNodeIdx] === nextNode) {
-          nodesInWay.push(nextNode);
-        } else {
-          // Way was interrupted. Stop.
-          break;
-        }
-      }
-      // Once the last node was found, continue from the previous one
-      // because the ways share the connected nodes. We need to subtract 2
-      // because the loop will advance the index.
-      usedNodeIdxUpdate = nextNodeIdx - 2;
-
-      if (reversed) nodesInWay.reverse();
-
-      if (!usedWaysIdx[wayId]) {
-        usedWaysIdx[wayId] = {
-          id: wayId,
-          segments: [
-            nodesInWay
-          ]
-        };
-      } else {
-        usedWaysIdx[wayId].segments.push(nodesInWay);
-      }
-    });
-
-    // Update with new value.
-    usedNodeIdx = usedNodeIdxUpdate;
-  }
-  tEnd(`Node search`)();
-
-  tStart(`len calc`)();
-  for (const wayId in usedWaysIdx) {
-    const segments = usedWaysIdx[wayId].segments;
-
-    const usedLength = segments.reduce((acc, nodes) => {
-      let feat = {
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: nodes.map(nid => ([
-            nodesList[nid].lon,
-            nodesList[nid].lat
-          ]))
-        }
-      };
-      return acc + tLen(feat);
-    }, 0);
-
-    usedWaysIdx[wayId].usedLength = usedLength;
-  }
-  tEnd(`len calc`)();
-
-  return usedWaysIdx;
-}
 
 const FLOOD_RETURN_PERIOD = [10, 20, 50, 100];
 const FLOOD_REPAIR_TIME = {
@@ -184,24 +48,52 @@ async function getImpassableWays () {
 
 async function getUpgradeWaySpeed () {
   // TODO: Implement
-  return Math.round(1 / 0.004 * 10000);
+  return Math.round(1 / 0.4);
 }
 
-/**
- * Promise version of osrm.route()
- *
- * @param {osrm} osrm The OSRM instance.
- * @param {object} opts Options to pass to the route method.
- */
-function osrmRoute (osrm, opts) {
+function osrmTable (osrm, opts) {
   return new Promise((resolve, reject) => {
-    osrm.route(opts, (err, res) => {
+    osrm.table(opts, (err, res) => {
       if (err) return reject(err);
-      return resolve(res);
+
+      // Create origin destination array.
+      const table = res.durations;
+      const len = table.length;
+      var result = [];
+
+      // For loops, not as pretty but fast.
+      for (let rn = 0; rn < len - 1; rn++) {
+        for (let cn = rn + 1; cn < len; cn++) {
+          // Going from A to B may yield a different value than going from
+          // B to A. For some reason if the starting point is near a road that
+          // is ignored (with the speed profile) it will be marked and
+          // unroutable and null is returned.
+          let ab = table[rn][cn];
+          let ba = table[cn][rn];
+
+          // When the closest segment to A or B is the one ignored, the route
+          // should be considered unroutable. This will solve the cases
+          // outlined in https://github.com/developmentseed/moz-datapipeline/issues/7#issuecomment-363153755
+          if (ab === null || ba === null) {
+            result.push({
+              oIdx: rn,
+              dIdx: cn,
+              routable: false,
+              ruc: null
+            });
+          } else {
+            result.push({
+              oIdx: rn,
+              dIdx: cn,
+              routable: true,
+              ruc: Math.max(ab, ba) / 3600
+            });
+          }
+        }
+      }
+      return resolve(result);
     });
   });
-}
-
 }
 
 let floodOSRMFiles = {
@@ -222,36 +114,38 @@ let floodOSRMFiles = {
  */
 async function prepareFloodOSRMFiles (upgradeWay, upgradeSpeed) {
   return Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
+    tStart(`[IGNORE WAYS] ${retPeriod} ALL`)();
     const impassableWays = await getImpassableWays(retPeriod);
 
     const osrmFolderName = `osrm-flood-${retPeriod}`;
     const osrmFolder = `${TMP_DIR}/${osrmFolderName}`;
 
-    tStart(`[IGNORE WAYS] ${retPeriod} clean`)();
+    // tStart(`[IGNORE WAYS] ${retPeriod} clean`)();
     await fs.copy(OSRM_FOLDER, osrmFolder);
-    tEnd(`[IGNORE WAYS] ${retPeriod} clean`)();
+    // tEnd(`[IGNORE WAYS] ${retPeriod} clean`)();
 
     const speedProfileFile = `${TMP_DIR}/speed-${retPeriod}.csv`;
 
-    tStart(`[IGNORE WAYS] ${retPeriod} traffic profile`)();
+    // tStart(`[IGNORE WAYS] ${retPeriod} traffic profile`)();
     await createSpeedProfile(speedProfileFile, impassableWays);
-    tEnd(`[IGNORE WAYS] ${retPeriod} traffic profile`)();
+    // tEnd(`[IGNORE WAYS] ${retPeriod} traffic profile`)();
 
     // If there is a way to upgrade, update the speed profile accordingly.
     if (upgradeWay) {
-      tStart(`[IGNORE WAYS] ${retPeriod} traffic profile upgrade`)();
+      // tStart(`[IGNORE WAYS] ${retPeriod} traffic profile upgrade`)();
       await createSpeedProfile(speedProfileFile, [upgradeWay], upgradeSpeed, true);
-      tEnd(`[IGNORE WAYS] ${retPeriod} traffic profile upgrade`)();
+      // tEnd(`[IGNORE WAYS] ${retPeriod} traffic profile upgrade`)();
     }
 
-    tStart(`[IGNORE WAYS] ${retPeriod} osm-contract`)();
+    // tStart(`[IGNORE WAYS] ${retPeriod} osm-contract`)();
     await osrmContract(osrmFolder, speedProfileFile, retPeriod, {ROOT_DIR, LOG_DIR});
-    tEnd(`[IGNORE WAYS] ${retPeriod} osm-contract`)();
+    // tEnd(`[IGNORE WAYS] ${retPeriod} osm-contract`)();
 
     // Speed profile file is no longer needed.
     fs.remove(speedProfileFile);
 
     floodOSRMFiles[retPeriod] = osrmFolder;
+    tEnd(`[IGNORE WAYS] ${retPeriod} ALL`)();
   }, {concurrency: 5});
 }
 
@@ -267,67 +161,58 @@ function getFloodOSRMFile (retPeriod) {
 }
 
 /**
- * Calculates the Expected Annual User Loss for an OD pair.
+ * Calculates the Expected Annual User Loss for all OD pairs.
  * To do this it uses a formula that relates the RUC of the baseline RN
  * and the RUC of the different flood return periods.
  *
  * @param {string} osrmFolder Path to the osrm folder to use.
- * @param {object} origin Origin for the route.
- * @param {object} destination Destination for the route.
+ * @param {arra} odPairs OD Pairs to use.
  *
- * @uses calcRUC()
  * @uses getFloodOSRMFile()
+ * @uses osrmTable()
  */
-async function calcEaul (osrmFolder, origin, destination) {
-  // Calculate baseline RUC for this OD pair.
-  // Using road network with no disruptions.
-  const odPairRUC = await calcRUC(osrmFolder, origin, destination);
-  clog(`RUC ${origin.properties.Name} - ${destination.properties.Name}`, odPairRUC);
+async function calcEaul (osrmFolder, odPairs, identifier = 'all') {
+  // Extract all the coordinates for osrm
+  const coords = odPairs.map(feat => feat.geometry.coordinates);
+
+  var osrm = new OSRM(`${OSRM_FOLDER}/roadnetwork.osrm`);
+  const baselineRuc = await osrmTable(osrm, {coordinates: coords});
+  jsonToFile(`${LOG_DIR}/no-flood--${identifier}.json`)(baselineRuc);
 
   // Calculate RUC on a flooded RN depending on the flood return period.
   const increaseUCost = await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
     const floodOSRM = getFloodOSRMFile(retPeriod);
-    const ruc = await calcRUC(floodOSRM, origin, destination);
-    // TODO: Add od pair traffic.
-    return FLOOD_REPAIR_TIME[retPeriod] * (ruc - odPairRUC) * 1;
+    var osrm = new OSRM(`${floodOSRM}/roadnetwork.osrm`);
+    const result = await osrmTable(osrm, {coordinates: coords});
+    // Calculate the increased user cost for each OD pair.
+    const uCost = result.map((r, idx) => {
+      // TODO: Add od pair traffic.
+      const odTraffic = 1;
+      return {
+        ...r,
+        increaseUCost: FLOOD_REPAIR_TIME[retPeriod] * (r.ruc - baselineRuc[idx].ruc) * odTraffic
+      };
+    });
+
+    jsonToFile(`${LOG_DIR}/flood-${retPeriod}--${identifier}.json`)(uCost);
+
+    return uCost;
   }, {concurrency: 5});
 
-  clog('increased user cost', increaseUCost);
+  // For each OD pair calculate the EAUL and sum everything.
+  const eaul = baselineRuc.reduce((acc, odPair, idx) => {
+    // Calculate the EAUL from the increased user cost using the trapezoidal rule.
+    let sum = 0;
+    const t = FLOOD_RETURN_PERIOD;
+    const u = increaseUCost;
+    for (let i = 0; i <= t.length - 2; i++) {
+      // u[i][idx].increaseUCost --> increased user cost for the current od pair.
+      sum += (1 / t[i] - 1 / t[i + 1]) * (u[i][idx].increaseUCost + u[i + 1][idx].increaseUCost);
+    }
+    return acc + sum;
+  }, 0);
 
-  // Calculate the EAUL from the increased user cost using the trapezoidal rule.
-  let sum = 0;
-  const t = FLOOD_RETURN_PERIOD;
-  const u = increaseUCost;
-  for (let i = 0; i <= t.length - 2; i++) {
-    sum += (1 / t[i] - 1 / t[i + 1]) * (u[i] + u[i + 1]);
-  }
-
-  return sum ? sum / 2 : 0;
-}
-
-/**
- * Calculates the Road User Cost for an OD pair.
- *
- * @param {string} osrmFolder Path to the osrm folder to use.
- * @param {object} origin Origin for the route.
- * @param {object} destination Destination for the route.
- *
- * @uses osrmRoute()
- */
-async function calcRUC (osrmFolder, origin, destination) {
-  var osrm = new OSRM(`${osrmFolder}/roadnetwork.osrm`);
-  const coordinates = [
-    origin.geometry.coordinates,
-    destination.geometry.coordinates
-  ];
-
-  const result = await osrmRoute(osrm, {coordinates, annotations: ['nodes']});
-  // Through the osrm speed profile we set the speed to be 1/ruc.
-  // By doing so, the total time (in hours) will be cost of the kms travelled.
-  const ruc = result.routes[0].legs[0].duration / 3600 * 10000;
-
-  jsonToFile(`${LOG_DIR}/result-${origin.properties.Name}-${destination.properties.Name}.json`)(result);
-  return ruc;
+  return eaul;
 }
 
 //
@@ -338,22 +223,9 @@ async function run (odPairs) {
   // Prepare the OSRM files per flood return period.
   await prepareFloodOSRMFiles();
 
-  // Calculate the baseline EAUL for the RN.
-  let baselineEAUL = 0;
-  // For each od api combination.
-  await forEachArrayCombination(odPairs, async (origin, destination) => {
-    clog('origin', origin);
-    clog('destination', destination);
-    tStart('EAUL od pair')();
-    // Calculate EAUL (Expected Annual User Loss) for this OD pair.
-    const odPairEaul = await calcEaul(OSRM_FOLDER, origin, destination);
-    tEnd('EAUL od pair')();
-    clog('odPairEaul', odPairEaul);
-    clog('--------');
-    clog('');
-    baselineEAUL += odPairEaul;
-  });
-  clog('baselineEAUL', baselineEAUL);
+  tStart(`[baseline] calcEaul`)();
+  const baselineEAUL = await calcEaul(OSRM_FOLDER, odPairs);
+  tEnd(`[baseline] calcEaul`)();
 
   // Create an OSRM for upgrades.
   const osrmUpFolderName = 'osrm-upgrade';
@@ -362,8 +234,15 @@ async function run (odPairs) {
 
   // Upgrade way.
   for (const way of waysList.slice(300, 301)) {
+    let wayResult = {
+      id: way.id,
+      eaul: {}
+    };
+    tStart(`[UPGRADE WAYS] ${way.id} FULL`)();
     for (const upgrade of ROAD_UPGRADES) {
-      clog('[UPGRADE WAYS] id, upgrade', way.id, upgrade);
+      tStart(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
+
+      clog('[UPGRADE WAYS] id, upgrade:', way.id, upgrade);
       // Get new speeds for this upgraded way.
       const speed = await getUpgradeWaySpeed(way, upgrade);
 
@@ -384,19 +263,19 @@ async function run (odPairs) {
       await prepareFloodOSRMFiles(way, speed);
 
       // Calculate the EAUL of all OD pairs for this way-upgrade combination.
-      let wayUpgradeEAUL = 0;
-      // For each od api combination.
-      await forEachArrayCombination(odPairs, async (origin, destination) => {
-        // Calculate EAUL (Expected Annual User Loss) for this OD pair.
-        const odPairEaul = await calcEaul(osrmUpFolder, origin, destination);
-        clog('[UPGRADE WAYS] id, eaul:', way.id, odPairEaul);
-        wayUpgradeEAUL += odPairEaul;
-      });
-      clog('[UPGRADE WAYS] wayUpgradeEAUL:', wayUpgradeEAUL);
+      tStart(`[UPGRADE WAYS] ${way.id} calcEaul`)();
+      const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, `up-${way.id}-${upgrade}`);
+      tEnd(`[UPGRADE WAYS] ${way.id} calcEaul`)();
 
       const finalEAUL = baselineEAUL - wayUpgradeEAUL;
       clog(`For way [${way.id}] with the upgrade [${upgrade}] the eaul is`, finalEAUL);
+
+      wayResult.eaul[upgrade] = finalEAUL;
+
+      tEnd(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
     }
+    jsonToFile(`${LOG_DIR}/result-${way.id}.json`)(wayResult);
+    tEnd(`[UPGRADE WAYS] ${way.id} FULL`)();
   }
 }
 

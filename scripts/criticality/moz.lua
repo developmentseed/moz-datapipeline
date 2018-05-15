@@ -121,8 +121,8 @@ function process_way (profile, way, result)
   -- We just need the routing engine to pick the best route given the RUC.
   -- Set the speed such as the lower the RUC the better.
 
-  result.forward_speed = 1 / ruc * 10000
-  result.backward_speed = 1 / ruc * 10000
+  result.forward_speed = 1 / ruc
+  result.backward_speed = 1 / ruc
 
 end
 
