@@ -96,9 +96,6 @@ function osrmTable (osrm, opts) {
   });
 }
 
-let floodOSRMFiles = {
-  // event: osrm path
-};
 /**
  * Creates a osrm file for each return period ignoring the segments that
  * get flooded on that return period. To ignore the segments the speed between
@@ -106,25 +103,29 @@ let floodOSRMFiles = {
  * If an upgradeWay is provided, the given speed is added to the profile file
  * for the nodes in that way.
  *
+ * @param {string} wdir Working directory. Defaults to TMP_DIR
  * @param {string} osrmFolder Path to the baseline OSRM
  * @param {object} upgradeWay Way that is going to be upgraded.
  * @param {number} upgradeSpeed Speed to use for the upgraded way.
  *
- * @returns Promise, but caches the osrm file paths in var `floodOSRMFiles`
+ * @returns OSRM file paths for flood files.
  */
-async function prepareFloodOSRMFiles (upgradeWay, upgradeSpeed) {
-  return Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
-    tStart(`[IGNORE WAYS] ${retPeriod} ALL`)();
+async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgradeSpeed) {
+  let floodOSRMFiles = {};
+  const identifier = upgradeWay ? upgradeWay.id : '';
+
+  await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
+    tStart(`[IGNORE WAYS] ${identifier} ${retPeriod} ALL`)();
     const impassableWays = await getImpassableWays(retPeriod);
 
     const osrmFolderName = `osrm-flood-${retPeriod}`;
-    const osrmFolder = `${TMP_DIR}/${osrmFolderName}`;
+    const osrmFolder = `${wdir}/${osrmFolderName}`;
 
     // tStart(`[IGNORE WAYS] ${retPeriod} clean`)();
     await fs.copy(OSRM_FOLDER, osrmFolder);
     // tEnd(`[IGNORE WAYS] ${retPeriod} clean`)();
 
-    const speedProfileFile = `${TMP_DIR}/speed-${retPeriod}.csv`;
+    const speedProfileFile = `${wdir}/speed-${retPeriod}.csv`;
 
     // tStart(`[IGNORE WAYS] ${retPeriod} traffic profile`)();
     await createSpeedProfile(speedProfileFile, impassableWays);
@@ -145,19 +146,10 @@ async function prepareFloodOSRMFiles (upgradeWay, upgradeSpeed) {
     fs.remove(speedProfileFile);
 
     floodOSRMFiles[retPeriod] = osrmFolder;
-    tEnd(`[IGNORE WAYS] ${retPeriod} ALL`)();
+    tEnd(`[IGNORE WAYS] ${identifier} ${retPeriod} ALL`)();
   }, {concurrency: 5});
-}
 
-/**
- * Return the osrm file path for a given return period.
- * @param {number} retPeriod Return period for which to get osrm file path.
- */
-function getFloodOSRMFile (retPeriod) {
-  if (!floodOSRMFiles[retPeriod]) {
-    throw new Error(`Flood osrm file missing for return period ${retPeriod}. Have you run prepareFloodOSRMFiles()?`);
-  }
-  return floodOSRMFiles[retPeriod];
+  return floodOSRMFiles;
 }
 
 /**
@@ -171,7 +163,7 @@ function getFloodOSRMFile (retPeriod) {
  * @uses getFloodOSRMFile()
  * @uses osrmTable()
  */
-async function calcEaul (osrmFolder, odPairs, identifier = 'all') {
+async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all') {
   // Extract all the coordinates for osrm
   const coords = odPairs.map(feat => feat.geometry.coordinates);
 
@@ -181,7 +173,7 @@ async function calcEaul (osrmFolder, odPairs, identifier = 'all') {
 
   // Calculate RUC on a flooded RN depending on the flood return period.
   const increaseUCost = await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
-    const floodOSRM = getFloodOSRMFile(retPeriod);
+    const floodOSRM = floodOSRMFiles[retPeriod];
     var osrm = new OSRM(`${floodOSRM}/roadnetwork.osrm`);
     const result = await osrmTable(osrm, {coordinates: coords});
     // Calculate the increased user cost for each OD pair.
@@ -221,19 +213,23 @@ async function calcEaul (osrmFolder, odPairs, identifier = 'all') {
 
 async function run (odPairs) {
   // Prepare the OSRM files per flood return period.
-  await prepareFloodOSRMFiles();
+  let floodOSRMFiles = await prepareFloodOSRMFiles();
 
   tStart(`[baseline] calcEaul`)();
-  const baselineEAUL = await calcEaul(OSRM_FOLDER, odPairs);
+  const baselineEAUL = await calcEaul(OSRM_FOLDER, odPairs, floodOSRMFiles);
   tEnd(`[baseline] calcEaul`)();
 
-  // Create an OSRM for upgrades.
-  const osrmUpFolderName = 'osrm-upgrade';
-  const osrmUpFolder = `${TMP_DIR}/${osrmUpFolderName}`;
-  await fs.copy(OSRM_FOLDER, osrmUpFolder);
-
   // Upgrade way.
-  for (const way of waysList.slice(300, 301)) {
+  await Promise.map(waysList.slice(300, 301), async (way) => {
+    // Create working directory.
+    const workdir = `${TMP_DIR}/eaul-work-${way.id}`;
+    await fs.ensureDir(workdir);
+
+    // Create an OSRM for upgrades.
+    const osrmUpFolderName = 'osrm';
+    const osrmUpFolder = `${workdir}/${osrmUpFolderName}`;
+    await fs.copy(OSRM_FOLDER, osrmUpFolder);
+
     let wayResult = {
       id: way.id,
       eaul: {}
@@ -247,7 +243,7 @@ async function run (odPairs) {
       const speed = await getUpgradeWaySpeed(way, upgrade);
 
       // Create a speed profile for the baseline.
-      const speedProfileFile = `${TMP_DIR}/speed-upgrade-${way.id}.csv`;
+      const speedProfileFile = `${workdir}/speed-upgrade-${way.id}.csv`;
       tStart(`[UPGRADE WAYS] ${way.id} traffic profile`)();
       await createSpeedProfile(speedProfileFile, [way], speed);
       tEnd(`[UPGRADE WAYS] ${way.id} traffic profile`)();
@@ -260,11 +256,11 @@ async function run (odPairs) {
       fs.remove(speedProfileFile);
 
       // Prepare flood files for this way.
-      await prepareFloodOSRMFiles(way, speed);
+      let floodOSRMFiles = await prepareFloodOSRMFiles(workdir, way, speed);
 
       // Calculate the EAUL of all OD pairs for this way-upgrade combination.
       tStart(`[UPGRADE WAYS] ${way.id} calcEaul`)();
-      const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, `up-${way.id}-${upgrade}`);
+      const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade}`);
       tEnd(`[UPGRADE WAYS] ${way.id} calcEaul`)();
 
       const finalEAUL = baselineEAUL - wayUpgradeEAUL;
@@ -276,7 +272,7 @@ async function run (odPairs) {
     }
     jsonToFile(`${LOG_DIR}/result-${way.id}.json`)(wayResult);
     tEnd(`[UPGRADE WAYS] ${way.id} FULL`)();
-  }
+  }, {concurrency: 5});
 }
 
 (async function main () {

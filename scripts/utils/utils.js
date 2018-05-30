@@ -170,7 +170,8 @@ export function getRoadCondition (road) {
  */
 export function createSpeedProfile (speedProfileFile, ways, speed = 0, append = false) {
   return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(speedProfileFile, {flags: 'a'});
+    const opts = append ? {flags: 'a'} : {};
+    const file = fs.createWriteStream(speedProfileFile, opts);
 
     file
       .on('open', () => {
