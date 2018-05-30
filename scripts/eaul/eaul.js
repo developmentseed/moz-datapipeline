@@ -152,6 +152,7 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgradeSpeed) 
   return floodOSRMFiles;
 }
 
+let unroutableFloodedPairs = {};
 /**
  * Calculates the Expected Annual User Loss for all OD pairs.
  * To do this it uses a formula that relates the RUC of the baseline RN
@@ -162,6 +163,7 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgradeSpeed) 
  *
  * @uses getFloodOSRMFile()
  * @uses osrmTable()
+ * @uses {object} unroutableFloodedPairs
  */
 async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all') {
   // Extract all the coordinates for osrm
@@ -171,18 +173,37 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
   const baselineRuc = await osrmTable(osrm, {coordinates: coords});
   jsonToFile(`${LOG_DIR}/no-flood--${identifier}.json`)(baselineRuc);
 
+  // Flooding the network will make some OD pairs unroutable. When we run the
+  // eaul calculation for the 1st time we need to store which pairs become
+  // unroutable and disregard them on the subsequent calculations.
+  // It is not enough to check the routable flag because the pair may be
+  // routable on one of the flood return periods but not on the other.
+  // It is enough for one return period to be unroutbale to have the pair
+  // removed from all calculations.
+  // The unroutableFloodedPairs variable is stored as a global since it has to
+  // mutated by the first run which we identify by the 'all' identifier param.
+  let unroutablePairs = [];
+
   // Calculate RUC on a flooded RN depending on the flood return period.
   const increaseUCost = await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
     const floodOSRM = floodOSRMFiles[retPeriod];
     var osrm = new OSRM(`${floodOSRM}/roadnetwork.osrm`);
     const result = await osrmTable(osrm, {coordinates: coords});
+
+    if (identifier === 'all') {
+      // Global run.
+      const pairs = result.filter(o => !o.routable).map(o => `${o.oIdx}-${o.dIdx}`);
+      unroutablePairs = unroutablePairs.concat(pairs);
+    }
+
     // Calculate the increased user cost for each OD pair.
     const uCost = result.map((r, idx) => {
       // TODO: Add od pair traffic.
       const odTraffic = 1;
+      const increaseUCost = r.routable ? FLOOD_REPAIR_TIME[retPeriod] * (r.ruc - baselineRuc[idx].ruc) * odTraffic : null;
       return {
         ...r,
-        increaseUCost: FLOOD_REPAIR_TIME[retPeriod] * (r.ruc - baselineRuc[idx].ruc) * odTraffic
+        increaseUCost
       };
     });
 
@@ -191,12 +212,33 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
     return uCost;
   }, {concurrency: 5});
 
+  // Create the unroutable pairs index.
+  // NOTE: mutating global variable. See above.
+  if (identifier === 'all') {
+    clog('Computing unroutable pairs');
+    unroutablePairs.forEach(o => { unroutableFloodedPairs[o] = true; });
+    // Dump unroutable pairs to file.
+    const dump = Object.keys(unroutableFloodedPairs).map(o => {
+      const [oIdx, dIdx] = o.split('-');
+      return [ odPairs[oIdx], odPairs[dIdx] ];
+    });
+    jsonToFile(`${TMP_DIR}/unroutable-pairs.json`)(dump);
+  }
+
+  // Update the increaseUCost filtering out the unroutable pairs.
+  const increaseUCostFiltered = increaseUCost.map(retPeriodData => {
+    // Filter if is on the index.
+    return retPeriodData.filter(odPair => !unroutableFloodedPairs[`${odPair.oIdx}-${odPair.dIdx}`]);
+  });
+  // Filter unroutable pairs from the baseline ruc list as well.
+  const baselineRucFiltered = baselineRuc.filter(odPair => !unroutableFloodedPairs[`${odPair.oIdx}-${odPair.dIdx}`]);
+
   // For each OD pair calculate the EAUL and sum everything.
-  const eaul = baselineRuc.reduce((acc, odPair, idx) => {
+  const eaul = baselineRucFiltered.reduce((acc, odPair, idx) => {
     // Calculate the EAUL from the increased user cost using the trapezoidal rule.
     let sum = 0;
     const t = FLOOD_RETURN_PERIOD;
-    const u = increaseUCost;
+    const u = increaseUCostFiltered;
     for (let i = 0; i <= t.length - 2; i++) {
       // u[i][idx].increaseUCost --> increased user cost for the current od pair.
       sum += (1 / t[i] - 1 / t[i + 1]) * (u[i][idx].increaseUCost + u[i + 1][idx].increaseUCost);
