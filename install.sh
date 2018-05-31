@@ -38,5 +38,5 @@ make && make install
 ## Housekeeping
 cd /
 rm -rf /tmp/tippecanoe-src
-apt-get -y remove --purge git build-essential make
+apt-get -y remove --purge build-essential make
 apt-get -y autoremove

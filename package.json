@@ -41,7 +41,7 @@
     "node-cleanup": "^2.1.2",
     "node-fetch": "^2.1.2",
     "osm2obj": "^3.0.0",
-    "osrm": "5.16.4",
+    "osrm": "https://github.com/developmentseed/osrm-backend#v5.18.0",
     "rbush": "^2.0.2",
     "through2": "^2.0.3"
   },

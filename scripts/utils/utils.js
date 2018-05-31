@@ -254,7 +254,8 @@ export async function osrmContract (osrmFolder, speedProfileFile, processId, opt
     '--rm',
     '-t',
     '-v', `${dockerVolMount}:${dockerVolMount}`,
-    'osrm/osrm-backend:v5.16.4',
+    // 'osrm/osrm-backend:v5.16.4',
+    'developmentseed/osrm-backend:5.18-b',
     'osrm-contract',
     '--segment-speed-file', pathSpeedProf,
     `${pathOSRM}/roadnetwork.osrm`
