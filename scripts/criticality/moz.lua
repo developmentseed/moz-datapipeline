@@ -44,6 +44,13 @@ end
 -- Define the properties and configuration.
 function setup ()
   return {
+    properties = {
+      -- Increase accuracy of routing.
+      max_speed_for_map_matching      = 1000000/3.6, -- 1000000kmph -> m/s - Make it unlimited
+      weight_name                     = 'ruc',
+      weight_precision               = 5
+    },
+
     road_classes = {
       Primary = true,
       Secondary = true,
@@ -120,9 +127,13 @@ function process_way (profile, way, result)
   -- In this case we don't care about the routing time.
   -- We just need the routing engine to pick the best route given the RUC.
   -- Set the speed such as the lower the RUC the better.
-
+  -- By doing 1 / ruc, the resulting time will be our cost.
   result.forward_speed = 1 / ruc
   result.backward_speed = 1 / ruc
+
+  -- The weight can be thought of as the resistance or cost when
+  -- passing the way. Routing will prefer ways with low weight.
+  result.weight = ruc
 
 end
 

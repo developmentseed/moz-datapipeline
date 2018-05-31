@@ -159,7 +159,7 @@ let unroutableFloodedPairs = {};
  * and the RUC of the different flood return periods.
  *
  * @param {string} osrmFolder Path to the osrm folder to use.
- * @param {arra} odPairs OD Pairs to use.
+ * @param {array} odPairs OD Pairs to use.
  *
  * @uses getFloodOSRMFile()
  * @uses osrmTable()
@@ -169,7 +169,7 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
   // Extract all the coordinates for osrm
   const coords = odPairs.map(feat => feat.geometry.coordinates);
 
-  var osrm = new OSRM(`${OSRM_FOLDER}/roadnetwork.osrm`);
+  var osrm = new OSRM({ path: `${OSRM_FOLDER}/roadnetwork.osrm`, algorithm: 'CH' });
   const baselineRuc = await osrmTable(osrm, {coordinates: coords});
   jsonToFile(`${LOG_DIR}/no-flood--${identifier}.json`)(baselineRuc);
 
@@ -178,7 +178,7 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
   // unroutable and disregard them on the subsequent calculations.
   // It is not enough to check the routable flag because the pair may be
   // routable on one of the flood return periods but not on the other.
-  // It is enough for one return period to be unroutbale to have the pair
+  // It is enough for one return period to be unroutable to have the pair
   // removed from all calculations.
   // The unroutableFloodedPairs variable is stored as a global since it has to
   // mutated by the first run which we identify by the 'all' identifier param.
@@ -187,7 +187,7 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
   // Calculate RUC on a flooded RN depending on the flood return period.
   const increaseUCost = await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
     const floodOSRM = floodOSRMFiles[retPeriod];
-    var osrm = new OSRM(`${floodOSRM}/roadnetwork.osrm`);
+    var osrm = new OSRM({ path: `${floodOSRM}/roadnetwork.osrm`, algorithm: 'CH' });
     const result = await osrmTable(osrm, {coordinates: coords});
 
     if (identifier === 'all') {
