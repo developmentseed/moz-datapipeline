@@ -1,6 +1,3 @@
-# EAUL
-
-
 ## Algorithms
 According to the docs:
 
