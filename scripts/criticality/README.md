@@ -13,13 +13,13 @@ python libs/ogr2osm/ogr2osm.py output/roadnetwork.shp --split-ways 1 -t libs/ogr
 
 # Create ways list
 ```
-node scripts/criticality/extract-ways.js output/
+node scripts/utils/extract-ways.js output/
 ```
 
 # OSRM
 ```
 mkdir output/osrm
-docker run -t -v $(pwd):/data osrm/osrm-backend:v5.16.4 osrm-extract -p /data/scripts/criticality/moz.lua /data/output/roadnetwork.osm
+docker run -t -v $(pwd):/data osrm/osrm-backend:v5.16.4 osrm-extract -p /data/scripts/utils/moz.lua /data/output/roadnetwork.osm
 docker run -t -v $(pwd):/data osrm/osrm-backend:v5.16.4 osrm-contract /data/output/roadnetwork.osrm
 mv output/roadnetwork.osrm* output/osrm
 ```
