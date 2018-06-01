@@ -3,29 +3,64 @@ import fs from 'fs-extra';
 import path from 'path';
 import Promise from 'bluebird';
 import OSRM from 'osrm';
+import program from 'commander';
 
-import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
-import { createSpeedProfile, osrmContract } from '../utils/utils';
+import { tStart, tEnd, jsonToFile, initLog } from '../scripts/utils/logging';
+import { createSpeedProfile, osrmContract } from '../scripts/utils/utils';
 
 const { ROOT_DIR } = process.env;
+
+/**
+ * Calculate the eaul for each improvement on the given ways
+ *
+ * Usage:
+ *  $node ./script-eaul/ [options] <source-dir>
+ *
+ */
+
+const createWaysIndexObj = (string) => {
+  let obj = {};
+  string.split(',').forEach(w => { obj[w] = true; });
+  return obj;
+};
+
+program.version('0.1.0')
+  .option('-l <dir>', 'log directory. If not provided one will be created in the source dir')
+  .option('-w, --ways <ways>', 'Way ids comma separated (10,1,5,13). If none provided the whole list is used.', createWaysIndexObj)
+  .description('Calculate the eaul for each improvement on the given ways')
+  .usage('[options] <source-dir>')
+  .parse(process.argv);
+
+if (program.args.length !== 1) {
+  program.help();
+  process.exit(1);
+}
 
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
-const TMP_DIR = path.resolve(__dirname, '../../.tmp');
-const LOG_DIR = path.resolve(__dirname, '../../log/eaul');
+const SOURCE_DIR = program.args[0];
+const TMP_DIR = path.resolve(SOURCE_DIR, 'workdir');
+const LOG_DIR = program.L || path.resolve(TMP_DIR, 'logs');
 
-const OD_FILE = path.resolve(TMP_DIR, 'od-mini.geojson');
-const OSRM_FOLDER = path.resolve(TMP_DIR, 'osrm');
-const WAYS_FILE = path.resolve(TMP_DIR, 'roadnetwork-osm-ways.json');
+const OD_FILE = path.resolve(SOURCE_DIR, 'od.geojson');
+const OSRM_FOLDER = path.resolve(SOURCE_DIR, 'osrm');
+const WAYS_FILE = path.resolve(SOURCE_DIR, 'roadnetwork-osm-ways.json');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Using OD Pairs', OD_FILE);
 clog('Using RN Ways', WAYS_FILE);
 const odPairs = fs.readJsonSync(OD_FILE);
-var waysList = fs.readJsonSync(WAYS_FILE);
+var allWaysList = fs.readJsonSync(WAYS_FILE);
+
+// Filter ways according to input.
+var waysList = program.ways ? allWaysList.filter(w => program.ways[w.id]) : allWaysList;
+
+if (!waysList.length) {
+  waysList = waysList.slice(300, 301);
+  // throw new Error('Way list is empty');
+}
 
 const FLOOD_RETURN_PERIOD = [10, 20, 50, 100];
 const FLOOD_REPAIR_TIME = {
@@ -43,7 +78,7 @@ const ROAD_UPGRADES = [
 
 async function getImpassableWays () {
   // TODO: Implement
-  return waysList.slice(0, 100);
+  return allWaysList.slice(0, 100);
 }
 
 async function getUpgradeWaySpeed () {
@@ -255,14 +290,16 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
 
 async function run (odPairs) {
   // Prepare the OSRM files per flood return period.
+  clog('[baseline] Prepare OSRM flood');
   let floodOSRMFiles = await prepareFloodOSRMFiles();
 
+  clog('[baseline] Calculate EAUL');
   tStart(`[baseline] calcEaul`)();
   const baselineEAUL = await calcEaul(OSRM_FOLDER, odPairs, floodOSRMFiles);
   tEnd(`[baseline] calcEaul`)();
 
   // Upgrade way.
-  await Promise.map(waysList.slice(300, 301), async (way) => {
+  await Promise.map(waysList, async (way) => {
     // Create working directory.
     const workdir = `${TMP_DIR}/eaul-work-${way.id}`;
     await fs.ensureDir(workdir);
@@ -290,6 +327,7 @@ async function run (odPairs) {
       await createSpeedProfile(speedProfileFile, [way], speed);
       tEnd(`[UPGRADE WAYS] ${way.id} traffic profile`)();
 
+      clog(`[UPGRADE WAYS] ${way.id} OSRM contract`);
       tStart(`[UPGRADE WAYS] ${way.id} osm-contract`)();
       await osrmContract(osrmUpFolder, speedProfileFile, way.id, {ROOT_DIR, LOG_DIR});
       tEnd(`[UPGRADE WAYS] ${way.id} osm-contract`)();
@@ -298,9 +336,11 @@ async function run (odPairs) {
       fs.remove(speedProfileFile);
 
       // Prepare flood files for this way.
+      clog(`[UPGRADE WAYS] ${way.id} Prepare OSRM flood`);
       let floodOSRMFiles = await prepareFloodOSRMFiles(workdir, way, speed);
 
       // Calculate the EAUL of all OD pairs for this way-upgrade combination.
+      clog(`[UPGRADE WAYS] ${way.id} Calculate EAUL`);
       tStart(`[UPGRADE WAYS] ${way.id} calcEaul`)();
       const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade}`);
       tEnd(`[UPGRADE WAYS] ${way.id} calcEaul`)();
@@ -320,7 +360,6 @@ async function run (odPairs) {
 (async function main () {
   try {
     await Promise.all([
-      fs.ensureDir(OUTPUT_DIR),
       fs.ensureDir(TMP_DIR),
       fs.ensureDir(LOG_DIR),
       fs.ensureDir(`${LOG_DIR}/osm-contract-logs`)
