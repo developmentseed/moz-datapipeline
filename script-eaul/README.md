@@ -2,11 +2,25 @@
 
 The EAUL script is different from the others since it isn't part of the pipeline when it runs. Calculating the EAUL is very computationally expensive, so this was built as a docker container that can run in several machines at once allowing distributed computation.
 
+Information about the script that adds the results back into the road network can be found on the [merge-eaul README.md](../scripts/merge-eaul)
+
 ## Running locally
-The script can be ran locally without docker. In this case run the node scrip directly bypassing the `eaul.sh`
+The script can be ran locally without docker. In this case run the node script directly bypassing the `eaul.sh`
 Useful during development.
 ```
 node script-eaul/ .tmp/ -l log/eaul -w 21926,22672
+
+Usage: script-eaul [options] <source-dir>
+
+  Calculate the eaul for each improvement on the given ways
+
+  Options:
+
+    -V, --version      output the version number
+    -l <dir>           log directory. If not provided one will be created in the source dir
+    -o <dir>           Results directory. If not provided one will be created in the source dir
+    -w, --ways <ways>  Way ids comma separated (10,1,5,13). If none provided the whole list is used.
+    -h, --help         output usage information
 ```
 
 ## Running with docker
