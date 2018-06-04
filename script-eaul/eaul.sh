@@ -50,4 +50,8 @@ mv roadnetwork.osrm* ./osrm
 
 # Running eaul
 echo "Calc eaul"
-node /var/pipeline/script-eaul/ /var/pipeline/.tmp --ways $WAY_IDS
+node /var/pipeline/script-eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results --ways $WAY_IDS
+
+# Upload results
+echo "Upload results"
+aws s3 sync /var/pipeline/.tmp/results/ s3://$S3_BUCKET/eaul/results/

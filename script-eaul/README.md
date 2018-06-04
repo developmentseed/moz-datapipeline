@@ -28,13 +28,13 @@ The docker image expects some env vars to be set:
 
 Example run code:
 ```
-docker run -it \
+docker run -it --rm \
   -v $(pwd)/script-eaul/.tmp:/var/pipeline/.tmp \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e S3_BUCKET=mozambique-road-planning \
   -e AWS_ACCESS_KEY_ID='code here' \
   -e AWS_SECRET_ACCESS_KEY='secret here' \
-  -e ROOT_DIR=$(pwd)/script-eaul/ \
+  -e ROOT_DIR=$(pwd)/script-eaul \
   -e WAY_IDS=21926,22672 \
   moz-eaul
 ```

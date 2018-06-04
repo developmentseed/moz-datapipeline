@@ -26,6 +26,7 @@ const createWaysIndexObj = (string) => {
 
 program.version('0.1.0')
   .option('-l <dir>', 'log directory. If not provided one will be created in the source dir')
+  .option('-o <dir>', 'Results directory. If not provided one will be created in the source dir')
   .option('-w, --ways <ways>', 'Way ids comma separated (10,1,5,13). If none provided the whole list is used.', createWaysIndexObj)
   .description('Calculate the eaul for each improvement on the given ways')
   .usage('[options] <source-dir>')
@@ -42,6 +43,7 @@ if (program.args.length !== 1) {
 const SOURCE_DIR = program.args[0];
 const TMP_DIR = path.resolve(SOURCE_DIR, 'workdir');
 const LOG_DIR = program.L || path.resolve(TMP_DIR, 'logs');
+const RESULTS_DIR = program.O || path.resolve(TMP_DIR, 'results');
 
 const OD_FILE = path.resolve(SOURCE_DIR, 'od.geojson');
 const OSRM_FOLDER = path.resolve(SOURCE_DIR, 'osrm');
@@ -257,7 +259,7 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
       const [oIdx, dIdx] = o.split('-');
       return [ odPairs[oIdx], odPairs[dIdx] ];
     });
-    jsonToFile(`${TMP_DIR}/unroutable-pairs.json`)(dump);
+    jsonToFile(`${RESULTS_DIR}/unroutable-pairs.json`)(dump);
   }
 
   // Update the increaseUCost filtering out the unroutable pairs.
@@ -311,6 +313,7 @@ async function run (odPairs) {
 
     let wayResult = {
       id: way.id,
+      name: way.tags.NAME,
       eaul: {}
     };
     tStart(`[UPGRADE WAYS] ${way.id} FULL`)();
@@ -346,13 +349,13 @@ async function run (odPairs) {
       tEnd(`[UPGRADE WAYS] ${way.id} calcEaul`)();
 
       const finalEAUL = baselineEAUL - wayUpgradeEAUL;
-      clog(`For way [${way.id}] with the upgrade [${upgrade}] the eaul is`, finalEAUL);
+      clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade}] the eaul is`, finalEAUL);
 
       wayResult.eaul[upgrade] = finalEAUL;
 
       tEnd(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
     }
-    jsonToFile(`${LOG_DIR}/result-${way.id}.json`)(wayResult);
+    jsonToFile(`${RESULTS_DIR}/result--${way.tags.NAME}.json`)(wayResult);
     tEnd(`[UPGRADE WAYS] ${way.id} FULL`)();
   }, {concurrency: 5});
 }
@@ -361,6 +364,7 @@ async function run (odPairs) {
   try {
     await Promise.all([
       fs.ensureDir(TMP_DIR),
+      fs.ensureDir(RESULTS_DIR),
       fs.ensureDir(LOG_DIR),
       fs.ensureDir(`${LOG_DIR}/osm-contract-logs`)
     ]);
