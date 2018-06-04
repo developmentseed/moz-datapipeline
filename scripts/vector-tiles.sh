@@ -1,5 +1,25 @@
 #! /bin/bash
 
+# Expects some env variables to be set:
+# AWS_ACCESS_KEY_ID
+# AWS_SECRET_ACCESS_KEY
+
+CONTROL=true
+ENV_VARS="AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY"
+
+for v in $ENV_VARS; do
+  if [ -z ${!v} ]; then
+      echo "Missing env variable: $v"
+      CONTROL=false
+  fi
+done
+
+if [ "$CONTROL" = false ]; then
+ exit 1
+fi
+
+exit 1
+
 # Generate vector tiles from the Road Network and upload the to S3.
 
 # Create a bucket
@@ -17,9 +37,6 @@ if [ -z "$AWS_BUCKET" ]; then
   echo "  bash vector-tiles.sh [bucket]"
   exit 1
 fi
-
-: "${AWS_ACCESS_KEY_ID?Need to set AWS_ACCESS_KEY_ID}"
-: "${AWS_SECRET_ACCESS_KEY?Need to set AWS_SECRET_ACCESS_KEY}"
 
 # Check if the road network geojson exists.
 if [ ! -f $OUTPUT_DIR/roadnetwork-indicators.geojson ]; then

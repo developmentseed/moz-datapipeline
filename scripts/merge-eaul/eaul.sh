@@ -15,7 +15,7 @@ for v in $ENV_VARS; do
   fi
 done
 
-if [ "$CONTROL" = "false" ]; then
+if [ "$CONTROL" = false ]; then
  exit 1
 fi
 
