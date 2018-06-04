@@ -54,4 +54,4 @@ node /var/pipeline/script-eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results
 
 # Upload results
 echo "Upload results"
-aws s3 sync /var/pipeline/.tmp/results/ s3://$S3_BUCKET/eaul/results/
+aws s3 sync /var/pipeline/.tmp/results/ s3://$S3_BUCKET/eaul/results/ --delete
