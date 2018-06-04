@@ -35,4 +35,7 @@ bash scripts/criticality/criticality.sh
 # Attach indicators to RN
 node ./scripts/merge-indicators/index.js
 
+# Attach eaul processing results
+bash scripts/merge-eaul/eaul.sh
+
 rm -r .tmp
