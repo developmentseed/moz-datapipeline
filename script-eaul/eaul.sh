@@ -44,8 +44,8 @@ echo "Running OSRM"
 cp /var/pipeline/scripts/utils/moz.lua /var/pipeline/.tmp
 mkdir osrm
 # For an explanation about $ROOT_DIR see docker-compose.yml
-docker run -t -v $ROOT_DIR/script-eaul/.tmp:/data/.tmp developmentseed/osrm-backend:5.18-b osrm-extract -p /data/.tmp/moz.lua /data/.tmp/roadnetwork.osm
-docker run -t -v $ROOT_DIR/script-eaul/.tmp:/data/.tmp developmentseed/osrm-backend:5.18-b osrm-contract /data/.tmp/roadnetwork.osrm
+docker run -t -v $ROOT_DIR/.tmp:/data/.tmp developmentseed/osrm-backend:5.18-b osrm-extract -p /data/.tmp/moz.lua /data/.tmp/roadnetwork.osm
+docker run -t -v $ROOT_DIR/.tmp:/data/.tmp developmentseed/osrm-backend:5.18-b osrm-contract /data/.tmp/roadnetwork.osrm
 mv roadnetwork.osrm* ./osrm
 
 # Running eaul
