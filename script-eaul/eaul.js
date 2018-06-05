@@ -72,6 +72,9 @@ const FLOOD_REPAIR_TIME = {
   100: 100
 };
 
+// The return period roads are designed for
+const ROAD_DESIGNSTANDARD = 20
+
 const ROAD_UPGRADES = [
   'one',
   'two',
@@ -80,15 +83,33 @@ const ROAD_UPGRADES = [
 
 /**
  * Returns the ways that become impassable for a given flood return period.
+ * A way is considered impassable if (WLcc - WLd * Dc) > 0.5
+ *
+ *  WLcc = water level for a given return period
+ *  WLd = water level design standard
+ *  Dc = drainage capacity rate
  *
  * @param {number} retPeriod  Flood return period.
  *                            Will be one of FLOOD_RETURN_PERIOD
+ * @param {object} floodDepth Object with flood depths per road per return
+ *                            period
+ *                            {"N1-T8083": {"10": 2.06, "20": 2.29}, "R441-T5116": {"10": 0.26, "20": 0.41}}
  *
  * @returns {array} List of ways that are impassable.
  */
-async function getImpassableWays (retPeriod) {
-  // TODO: Implement
-  return allWaysList.slice(0, 100);
+async function getImpassableWays (retPeriod, floodDepth) {
+  return allWaysList.filter(way => {
+    // Get Wlcc for this way, for the return period.
+    let wlcc = floodDepth[way.tags.NAME][retPeriod];
+
+    // Get Water Level that this road was designed for.
+    let wld = floodDepth[way.tags.NAME][ROAD_DESIGNSTANDARD];
+
+    // Drainage capacity rate is set to default 0.7
+    let dc = 0.7;
+
+    return (wlcc - wld * dc) > 0.5
+  })
 }
 
 /**
@@ -170,9 +191,12 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgradeSpeed) 
   let floodOSRMFiles = {};
   const identifier = upgradeWay ? upgradeWay.id : '';
 
+  // TMP load from S3 instead
+  const floodDepths = fs.readJsonSync(path.resolve(__dirname, './roadnetwork_stats.json'))
+
   await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
     tStart(`[IGNORE WAYS] ${identifier} ${retPeriod} ALL`)();
-    const impassableWays = await getImpassableWays(retPeriod);
+    const impassableWays = await getImpassableWays(retPeriod, floodDepths);
 
     const osrmFolderName = `osrm-flood-${retPeriod}`;
     const osrmFolder = `${wdir}/${osrmFolderName}`;
