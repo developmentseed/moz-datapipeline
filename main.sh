@@ -1,3 +1,6 @@
+#! /bin/bash
+set -e
+
 TMP_DIR=./.tmp
 
 bash ./scripts/preparation.sh
@@ -38,4 +41,4 @@ node ./scripts/merge-indicators/index.js
 # Attach eaul processing results
 bash scripts/merge-eaul/eaul.sh
 
-rm -r .tmp
+# rm -r .tmp/*

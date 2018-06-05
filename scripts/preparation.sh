@@ -51,7 +51,7 @@ checkRequiredFile './source/od-pairs' '*.shp' OD_FILE
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
-  rm -rf $TMP_DIR
+  rm -rf $TMP_DIR/*
 fi
 mkdir $TMP_DIR
 

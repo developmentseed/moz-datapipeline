@@ -19,7 +19,11 @@ apt-get install -y docker-ce
 groupadd docker
 usermod -aG docker $USER
 
-# Node JS 8.x (Specific version needed because of OSRM)
+# Python tools
+pip install awscli --upgrade --user
+pip install csvkit
+
+# Node JS 8.x
 curl -sL https://deb.nodesource.com/setup_8.x | bash -
 apt-get install -y nodejs
 

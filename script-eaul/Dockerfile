@@ -3,7 +3,6 @@ FROM ubuntu:latest
 COPY ./install.sh /
 
 RUN bash install.sh
-RUN pip install awscli --upgrade --user
 ENV PATH="/root/.local/bin:${PATH}"
 
 RUN mkdir -p /var/pipeline
