@@ -60,8 +60,8 @@ var allWaysList = fs.readJsonSync(WAYS_FILE);
 var waysList = program.ways ? allWaysList.filter(w => program.ways[w.id]) : allWaysList;
 
 if (!waysList.length) {
-  waysList = waysList.slice(300, 301);
-  // throw new Error('Way list is empty');
+  // waysList = waysList.slice(300, 301);
+  throw new Error('Way list is empty');
 }
 
 const FLOOD_RETURN_PERIOD = [10, 20, 50, 100];
@@ -78,14 +78,33 @@ const ROAD_UPGRADES = [
   'three'
 ];
 
-async function getImpassableWays () {
+/**
+ * Returns the ways that become impassable for a given flood return period.
+ *
+ * @param {number} retPeriod  Flood return period.
+ *                            Will be one of FLOOD_RETURN_PERIOD
+ *
+ * @returns {array} List of ways that are impassable.
+ */
+async function getImpassableWays (retPeriod) {
   // TODO: Implement
   return allWaysList.slice(0, 100);
 }
 
-async function getUpgradeWaySpeed () {
+/**
+ * Returns the new speed for a way given an upgrade.
+ * The speed is calculated with the formula: 1 / RUC
+ *
+ * @param {object} way  Way being upgraded.
+ * @param {string} upgrade Upgrade to apply to the way.
+ *                         Will be one of ROAD_UPGRADES
+ *
+ * @returns {number} New speed for way after the upgrade.
+ */
+async function getUpgradeWaySpeed (way, upgrade) {
   // TODO: Implement
-  return Math.round(1 / 0.4);
+  const ruc = 0.4;
+  return 1 / ruc;
 }
 
 function osrmTable (osrm, opts) {
