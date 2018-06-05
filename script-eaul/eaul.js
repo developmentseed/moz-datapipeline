@@ -72,6 +72,55 @@ const FLOOD_REPAIR_TIME = {
   100: 100
 };
 
+// Flood repair time depends on three factors:
+//  - type of road (primary, secondary, tertiary, vicinal)
+//  - surface type (paved, unpaved)
+//  - severity of the flood (low, medium, high)
+const FLOOD_REPAIRTIME = {
+  'low': {
+    'paved': {
+      'primary': 168,
+      'secondary': 168,
+      'tertiary': 168,
+      'vicinal': 168
+    },
+    'unpaved': {
+      'primary': 1440,
+      'secondary': 1440,
+      'tertiary': 1440,
+      'vicinal': 1440
+    }
+  },
+  'medium': {
+    'paved': {
+      'primary': 336,
+      'secondary': 336,
+      'tertiary': 336,
+      'vicinal': 336
+    },
+    'unpaved': {
+      'primary': 2160,
+      'secondary': 2160,
+      'tertiary': 2160,
+      'vicinal': 2160
+    }
+  },
+  'high': {
+    'paved': {
+      'primary': 1056,
+      'secondary': 1056,
+      'tertiary': 1056,
+      'vicinal': 1056
+    },
+    'unpaved': {
+      'primary': 4320,
+      'secondary': 4320,
+      'tertiary': 4320,
+      'vicinal': 4320
+    }
+  }
+}
+
 // The return period roads are designed for
 const ROAD_DESIGNSTANDARD = 20
 
