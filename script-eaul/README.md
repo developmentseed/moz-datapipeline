@@ -8,7 +8,7 @@ Information about the script that adds the results back into the road network ca
 The script can be ran locally without docker. In this case run the node script directly bypassing the `eaul.sh`
 Useful during development.
 ```
-node script-eaul/ .tmp/ -l log/eaul -w 21926,22672
+node script-eaul/ script-eaul/.tmp/ -l log/eaul -w 21926,22672
 
 Usage: script-eaul [options] <source-dir>
 
