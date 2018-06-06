@@ -173,24 +173,41 @@ export function createSpeedProfile (speedProfileFile, ways, speed = 0, append = 
     const opts = append ? {flags: 'a'} : {};
     const file = fs.createWriteStream(speedProfileFile, opts);
 
+    // The stream cannot process data as fast as the for loop prepares it
+    // so as soon as the buffer fills up the stream starts tp write into
+    // userspace memory. We need to check when file.write() returns false,
+    // and listen for the 'drain' event on the stream before continuing to
+    // write again in order to prevent all the process's memory from
+    // being used up. https://nodejs.org/api/stream.html#stream_event_drain
+    const processWays = (startIdx = 0) => {
+      // Compute traffic profile.
+      // https://github.com/Project-OSRM/osrm-backend/wiki/Traffic
+      for (let wIdx = startIdx; wIdx < ways.length; wIdx++) {
+        const way = ways[wIdx];
+        let contents = '';
+
+        if (wIdx !== 0 || append) { contents += '\n'; }
+        for (let i = 0; i < way.nodes.length - 1; i++) {
+          // Add line break unless it's first iteration.
+          if (i !== 0) { contents += '\n'; }
+
+          const node = way.nodes[i];
+          const nextNode = way.nodes[i + 1];
+
+          contents += `${node},${nextNode},${speed}\n`;
+          contents += `${nextNode},${node},${speed}`;
+        }
+
+        if (!file.write(contents)) {
+          file.once('drain', processWays.bind(null, wIdx + 1));
+          return;
+        }
+      }
+      file.end();
+    };
+
     file
-      .on('open', () => {
-        // Compute traffic profile.
-        // https://github.com/Project-OSRM/osrm-backend/wiki/Traffic
-        ways.forEach((way, idx) => {
-          if (idx !== 0 || append) { file.write('\n'); }
-          for (let i = 0; i < way.nodes.length - 2; i++) {
-            if (i !== 0) { file.write('\n'); }
-
-            const node = way.nodes[i];
-            const nextNode = way.nodes[i + 1];
-
-            file.write(`${node},${nextNode},${speed}\n`);
-            file.write(`${nextNode},${node},${speed}`);
-          }
-        });
-        file.end();
-      })
+      .on('open', () => processWays())
       .on('error', err => reject(err))
       .on('finish', () => resolve());
   });
