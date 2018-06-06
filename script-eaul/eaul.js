@@ -48,13 +48,17 @@ const RESULTS_DIR = program.O || path.resolve(TMP_DIR, 'results');
 const OD_FILE = path.resolve(SOURCE_DIR, 'od.geojson');
 const OSRM_FOLDER = path.resolve(SOURCE_DIR, 'osrm');
 const WAYS_FILE = path.resolve(SOURCE_DIR, 'roadnetwork-osm-ways.json');
+// TODO: Download from s3 and access through .tmp directory
+const FLOOD_DEPTH_FILE = path.resolve(__dirname, './roadnetwork_stats.json');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Using OD Pairs', OD_FILE);
 clog('Using RN Ways', WAYS_FILE);
+clog('Using Flood depth', FLOOD_DEPTH_FILE);
 const odPairs = fs.readJsonSync(OD_FILE);
 var allWaysList = fs.readJsonSync(WAYS_FILE);
+const floodDepth = fs.readJsonSync(FLOOD_DEPTH_FILE);
 
 // Filter ways according to input.
 var waysList = program.ways ? allWaysList.filter(w => program.ways[w.id]) : allWaysList;
@@ -63,6 +67,16 @@ if (!waysList.length) {
   // waysList = waysList.slice(300, 301);
   throw new Error('Way list is empty');
 }
+
+// Concurrency control.
+// Note that the flood osrm and eaul are computed inside the way processing
+// so the number being calculated can reach CONCURRENCY_WAYS x CONCURRENCY_FLOOD_OSRM
+// How many ways to process simultaneously.
+const CONCURRENCY_WAYS = 5;
+// How many osrm flood return period files to process simultaneously.
+const CONCURRENCY_FLOOD_OSRM = 5;
+// How many flood return period eaul calculations to run simultaneously.
+const CONCURRENCY_FLOOD_EAUL = 5;
 
 const FLOOD_RETURN_PERIOD = [10, 20, 50, 100];
 const FLOOD_REPAIR_TIME = {
@@ -119,10 +133,10 @@ const FLOOD_REPAIRTIME = {
       'vicinal': 4320
     }
   }
-}
+};
 
 // The return period roads are designed for
-const ROAD_DESIGNSTANDARD = 20
+const ROAD_DESIGNSTANDARD = 20;
 
 const ROAD_UPGRADES = [
   'one',
@@ -140,13 +154,13 @@ const ROAD_UPGRADES = [
  *
  * @param {number} retPeriod  Flood return period.
  *                            Will be one of FLOOD_RETURN_PERIOD
- * @param {object} floodDepth Object with flood depths per road per return
- *                            period
- *                            {"N1-T8083": {"10": 2.06, "20": 2.29}, "R441-T5116": {"10": 0.26, "20": 0.41}}
+ *
+ * @uses floodDepth Object with flood depths per road per return period
+ *                  {"N1-T8083": {"10": 2.06, "20": 2.29}, "R441-T5116": {"10": 0.26, "20": 0.41}}
  *
  * @returns {array} List of ways that are impassable.
  */
-async function getImpassableWays (retPeriod, floodDepth) {
+async function getImpassableWays (retPeriod) {
   return allWaysList.filter(way => {
     // Get Wlcc for this way, for the return period.
     let wlcc = floodDepth[way.tags.NAME][retPeriod];
@@ -157,8 +171,8 @@ async function getImpassableWays (retPeriod, floodDepth) {
     // Drainage capacity rate is set to default 0.7
     let dc = 0.7;
 
-    return (wlcc - wld * dc) > 0.5
-  })
+    return (wlcc - wld * dc) > 0.5;
+  });
 }
 
 /**
@@ -173,7 +187,7 @@ async function getImpassableWays (retPeriod, floodDepth) {
  */
 async function getUpgradeWaySpeed (way, upgrade) {
   // TODO: Implement
-  const ruc = 0.4;
+  const ruc = 0.04;
   return 1 / ruc;
 }
 
@@ -236,16 +250,14 @@ function osrmTable (osrm, opts) {
  *
  * @returns OSRM file paths for flood files.
  */
+
 async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgradeSpeed) {
   let floodOSRMFiles = {};
   const identifier = upgradeWay ? upgradeWay.id : '';
 
-  // TMP load from S3 instead
-  const floodDepths = fs.readJsonSync(path.resolve(__dirname, './roadnetwork_stats.json'))
-
   await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
     tStart(`[IGNORE WAYS] ${identifier} ${retPeriod} ALL`)();
-    const impassableWays = await getImpassableWays(retPeriod, floodDepths);
+    const impassableWays = await getImpassableWays(retPeriod);
 
     const osrmFolderName = `osrm-flood-${retPeriod}`;
     const osrmFolder = `${wdir}/${osrmFolderName}`;
@@ -276,7 +288,7 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgradeSpeed) 
 
     floodOSRMFiles[retPeriod] = osrmFolder;
     tEnd(`[IGNORE WAYS] ${identifier} ${retPeriod} ALL`)();
-  }, {concurrency: 5});
+  }, {concurrency: CONCURRENCY_FLOOD_OSRM});
 
   return floodOSRMFiles;
 }
@@ -339,7 +351,7 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
     jsonToFile(`${LOG_DIR}/flood-${retPeriod}--${identifier}.json`)(uCost);
 
     return uCost;
-  }, {concurrency: 5});
+  }, {concurrency: CONCURRENCY_FLOOD_EAUL});
 
   // Create the unroutable pairs index.
   // NOTE: mutating global variable. See above.
@@ -449,7 +461,7 @@ async function run (odPairs) {
     }
     jsonToFile(`${RESULTS_DIR}/result--${way.tags.NAME}.json`)(wayResult);
     tEnd(`[UPGRADE WAYS] ${way.id} FULL`)();
-  }, {concurrency: 5});
+  }, {concurrency: CONCURRENCY_WAYS});
 }
 
 (async function main () {
