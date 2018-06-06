@@ -138,9 +138,11 @@ const FLOOD_REPAIRTIME = {
 const ROAD_DESIGNSTANDARD = 20;
 
 const ROAD_UPGRADES = [
-  'one',
-  'two',
-  'three'
+  'upgrade-gravel',
+  'upgrade-asphalt',
+  'rehab-earth',
+  'rehab-gravel',
+  'rehab-asphalt'
 ];
 
 /**
