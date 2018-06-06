@@ -77,7 +77,7 @@ const CONCURRENCY_FLOOD_OSRM = 5;
 // How many flood return period eaul calculations to run simultaneously.
 const CONCURRENCY_FLOOD_EAUL = 5;
 
-const FLOOD_RETURN_PERIOD = [10, 20, 50, 100];
+const FLOOD_RETURN_PERIOD = [5, 10, 20, 50, 75, 100, 200, 250, 500, 1000];
 const FLOOD_REPAIR_TIME = {
   10: 10,
   20: 20,
