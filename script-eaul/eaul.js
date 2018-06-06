@@ -48,8 +48,7 @@ const RESULTS_DIR = program.O || path.resolve(TMP_DIR, 'results');
 const OD_FILE = path.resolve(SOURCE_DIR, 'od.geojson');
 const OSRM_FOLDER = path.resolve(SOURCE_DIR, 'osrm');
 const WAYS_FILE = path.resolve(SOURCE_DIR, 'roadnetwork-osm-ways.json');
-// TODO: Download from s3 and access through .tmp directory
-const FLOOD_DEPTH_FILE = path.resolve(__dirname, './roadnetwork_stats.json');
+const FLOOD_DEPTH_FILE = path.resolve(SOURCE_DIR, 'flood-depths-current.json')
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
