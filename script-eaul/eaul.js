@@ -188,13 +188,15 @@ const ROAD_UPGRADES = [
  *
  * @param {number} retPeriod  Flood return period.
  *                            Will be one of FLOOD_RETURN_PERIOD
+ * @param {object} upgradeWay Way that is going to be upgraded.
+ * @param {object} upgrade    Object with impact of road upgrade.
  *
  * @uses floodDepth Object with flood depths per road per return period
  *                  {"N1-T8083": {"10": 2.06, "20": 2.29}, "R441-T5116": {"10": 0.26, "20": 0.41}}
  *
  * @returns {array} List of ways that are impassable.
  */
-async function getImpassableWays (retPeriod) {
+async function getImpassableWays (retPeriod, upgradeWay, upgrade) {
   return allWaysList.filter(way => {
     // Get Wlcc for this way, for the return period.
     let wlcc = floodDepth[way.tags.NAME][retPeriod];
@@ -202,8 +204,8 @@ async function getImpassableWays (retPeriod) {
     // Get Water Level that this road was designed for.
     let wld = floodDepth[way.tags.NAME][ROAD_DESIGNSTANDARD];
 
-    // Drainage capacity rate is set to default 0.7
-    let dc = 0.7;
+    // Default drainage capacity is 0.7, unless road is upgraded
+    let dc = upgradeWay && way.id === upgradeWay.id ? upgrade.drainageCapacity : 0.7;
 
     return (wlcc - wld * dc) > 0.5;
   });
@@ -264,18 +266,18 @@ function osrmTable (osrm, opts) {
  * @param {string} wdir Working directory. Defaults to TMP_DIR
  * @param {string} osrmFolder Path to the baseline OSRM
  * @param {object} upgradeWay Way that is going to be upgraded.
- * @param {number} upgradeSpeed Speed to use for the upgraded way.
+ * @param {object} upgrade Object with impact of road upgrade.
  *
  * @returns OSRM file paths for flood files.
  */
 
-async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgradeSpeed) {
+async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgrade) {
   let floodOSRMFiles = {};
   const identifier = upgradeWay ? upgradeWay.id : '';
 
   await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
     tStart(`[IGNORE WAYS] ${identifier} ${retPeriod} ALL`)();
-    const impassableWays = await getImpassableWays(retPeriod);
+    const impassableWays = await getImpassableWays(retPeriod, upgradeWay, upgrade);
 
     const osrmFolderName = `osrm-flood-${retPeriod}`;
     const osrmFolder = `${wdir}/${osrmFolderName}`;
@@ -293,7 +295,7 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgradeSpeed) 
     // If there is a way to upgrade, update the speed profile accordingly.
     if (upgradeWay) {
       // tStart(`[IGNORE WAYS] ${retPeriod} traffic profile upgrade`)();
-      await createSpeedProfile(speedProfileFile, [upgradeWay], upgradeSpeed, true);
+      await createSpeedProfile(speedProfileFile, [upgradeWay], upgrade.speed, true);
       // tEnd(`[IGNORE WAYS] ${retPeriod} traffic profile upgrade`)();
     }
 
@@ -460,7 +462,7 @@ async function run (odPairs) {
 
       // Prepare flood files for this way.
       clog(`[UPGRADE WAYS] ${way.id} Prepare OSRM flood`);
-      let floodOSRMFiles = await prepareFloodOSRMFiles(workdir, way, upgrade.speed);
+      let floodOSRMFiles = await prepareFloodOSRMFiles(workdir, way, upgrade);
 
       // Calculate the EAUL of all OD pairs for this way-upgrade combination.
       clog(`[UPGRADE WAYS] ${way.id} Calculate EAUL`);
