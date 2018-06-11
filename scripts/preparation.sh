@@ -213,6 +213,7 @@ echo "All done preparing the OD data."
 #   - floods - an array with max water levels for the road
 #   - length - length of the road
 #   - provinceIso - ISO code of province the roads belongs to
+#   - ruc - scale the RUC
 #
 
 echo "Add additional properties to road network..."
