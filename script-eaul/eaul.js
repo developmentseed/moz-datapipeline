@@ -264,6 +264,57 @@ function osrmRoute (osrm, opts) {
 }
 
 /**
+ * Promise version of osrm.table()
+ *
+ * @param {osrm} osrm The OSRM instance.
+ * @param {object} opts Options to pass to the route method.
+ */
+function osrmTable (osrm, opts) {
+  return new Promise((resolve, reject) => {
+    osrm.table(opts, (err, res) => {
+      if (err) return reject(err);
+
+      // Create origin destination array.
+      const table = res.durations;
+      const len = table.length;
+      var result = [];
+
+      // For loops, not as pretty but fast.
+      for (let rn = 0; rn < len - 1; rn++) {
+        for (let cn = rn + 1; cn < len; cn++) {
+          // Going from A to B may yield a different value than going from
+          // B to A. For some reason if the starting point is near a road that
+          // is ignored (with the speed profile) it will be marked and
+          // unroutable and null is returned.
+          let ab = table[rn][cn];
+          let ba = table[cn][rn];
+
+          // When the closest segment to A or B is the one ignored, the route
+          // should be considered unroutable. This will solve the cases
+          // outlined in https://github.com/developmentseed/moz-datapipeline/issues/7#issuecomment-363153755
+          if (ab === null || ba === null) {
+            result.push({
+              oIdx: rn,
+              dIdx: cn,
+              routable: false,
+              ruc: null
+            });
+          } else {
+            result.push({
+              oIdx: rn,
+              dIdx: cn,
+              routable: true,
+              ruc: Math.max(ab, ba) / 3600
+            });
+          }
+        }
+      }
+      return resolve(result);
+    });
+  });
+}
+
+/**
  * Creates a osrm file for each return period ignoring the segments that
  * get flooded on that return period. To ignore the segments the speed between
  * nodes is set to 0.
@@ -433,8 +484,11 @@ async function calcEaul (osrmFolder, origin, destination, floodOSRMFiles) {
   const increaseUCost = await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
     const floodOSRM = floodOSRMFiles[retPeriod];
     const {ruc, ways} = await calcRoute(floodOSRM, origin, destination);
+
     // TODO: Add od pair traffic.
-    return FLOOD_REPAIR_TIME[retPeriod] * (ruc - odPairRes.ruc) * 1;
+    let trafficOd = 100;
+
+    return FLOOD_REPAIR_TIME[retPeriod] * (ruc - odPairRes.ruc) * trafficOd;
   }, {concurrency: 5});
 
   clog('increased user cost', increaseUCost);
@@ -489,6 +543,24 @@ async function calcRoute (osrmFolder, origin, destination) {
   return {ruc, ways};
 }
 
+/**
+ * Calculates the routes for an array of OD pairs. Return the RUC.
+ *
+ * @param {string} osrmFolder Path to the osrm folder to use.
+ * @param {array}  odPairs for the routes.
+ * @param {object} destination Destination for the route.
+ *
+ * @uses osrmTable()
+ */
+async function calcRoutes (osrmFolder, odPairs) {
+  // Extract all the coordinates for osrm
+  const coords = odPairs.map(feat => feat.geometry.coordinates);
+
+  var osrm = new OSRM({ path: `${OSRM_FOLDER}/roadnetwork.osrm`, algorithm: 'CH' });
+
+  return osrmTable(osrm, {coordinates: coords});
+}
+
 //
 //               (^.^)
 // RUN function below - Main entry point.
@@ -498,36 +570,24 @@ async function run (odPairs) {
   clog('[baseline] Prepare OSRM flood');
   let floodOSRMFiles = await prepareFloodOSRMFiles();
 
+  // Calculate RUC for each OD pair without disruption.
+  tStart(`[baseline] Baseline RUC for all OD pairs`)();
+  const baselineRuc = await calcRoutes(OSRM_FOLDER, odPairs)
+  tEnd(`[baseline] Baseline RUC for all OD pairs`)();
+
   // Create the unroutable pairs index.
   // Unroutable pairs will be stored like [oIdx-dIdx] = true because it
   // will be very fast to find the values.
   // https://github.com/developmentseed/moz-datapipeline/issues/26#issuecomment-389957802
-  let unroutableFloodedPairs = {};
-
-  // Calculate the baseline EAUL for the RN.
-  let baselineEAUL = 0;
-  // For each od api combination.
-  await forEachArrayCombination(odPairs, async (origin, destination, oIdx, dIdx) => {
-    clog('[baseline] Origin', origin.properties.Name);
-    clog('[baseline] Destination', destination.properties.Name);
-    tStart(`[baseline] ${oIdx}-${dIdx} EAUL od pair`)();
-    // Calculate EAUL (Expected Annual User Loss) for this OD pair.
-    let odPairEaul;
-    try {
-      odPairEaul = await calcEaul(OSRM_FOLDER, origin, destination, floodOSRMFiles);
-    } catch (e) {
-      if (e.message === 'Unroutable OD Pair') {
-        clog('[baseline] Found unroutable OD Pair');
-        unroutableFloodedPairs[`${oIdx}-${dIdx}`] = true;
-        odPairEaul = 0; // 0 and continue.
+  let unroutableFloodedPairs = baselineRuc
+    .filter(od => !od.routable)
+    .map(od => {
+      let odPairKey = `${od.oIdx}-${od.dIdx}`
+      return {
+        odPairKey: true
       }
-    }
-    tEnd(`[baseline] ${oIdx}-${dIdx} EAUL od pair`)();
-    clog(`[baseline] ${oIdx}-${dIdx} EAUL`, odPairEaul);
-    clog('');
-    baselineEAUL += odPairEaul;
-  }, CONCURRENCY_OD_PAIRS);
-  clog('[baseline] EAUL', baselineEAUL);
+    });
+
   clog('Unroutable pairs found:', Object.keys(unroutableFloodedPairs).length);
 
   // Dump unroutable pairs to file.
