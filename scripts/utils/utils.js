@@ -290,18 +290,39 @@ export async function osrmContract (osrmFolder, speedProfileFile, processId, opt
  * Returning false from the callback will stop the execution.
  *
  * @param {array} array The array over which to iterate.
- * @param {function} cb Callback function to execute on every iteration.
+ * @param {function} fn Callback function to execute on every iteration.
  *                      Signature is cb(valA:mixed, valB:mixed, idxA:int, idxB:int, all:array)
  */
-export async function forEachArrayCombination (array, cb) {
+export async function forEachArrayCombination (array, fn, concurrency = 1) {
+  let tasks = [];
   const len = array.length;
+  // Build options array.
   for (let aidx = 0; aidx <= len - 2; aidx++) {
     const a = array[aidx];
     for (let bidx = aidx + 1; bidx < len; bidx++) {
       const b = array[bidx];
-      const res = await cb(a, b, aidx, bidx, array);
-      // A false return value stops execution.
-      if (res === false) return;
+      tasks.push([a, b, aidx, bidx, array]);
     }
   }
+
+  // Bluebird's Promise.map does not ensure execution order. It starts the
+  // "concurrency num" of items from the start of the array, then continues
+  // from the end in decreasing order.
+  // The following code ensure that the start order of the promise follows
+  // the input order. It's mostly useful for debug.
+  let a = tasks.slice(0, concurrency);
+  let b = tasks.slice(concurrency);
+  b.reverse();
+  tasks = a.concat(b);
+
+  // Execute
+  await Promise.map(tasks, async (args) => {
+    const res = await fn(...args);
+    // A false return value stops execution.
+    if (res === false) throw new Error('stop');
+  }, {concurrency})
+    .catch(e => {
+      // If stop was on purpose do not throw.
+      if (e.message !== 'stop') throw e;
+    });
 }
