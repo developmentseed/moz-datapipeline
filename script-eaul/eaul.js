@@ -137,12 +137,45 @@ const FLOOD_REPAIRTIME = {
 // The return period roads are designed for
 const ROAD_DESIGNSTANDARD = 20;
 
+// New RUC
+const newRuc = {
+  'asphalt': 0.23,
+  'gravel': 0.27,
+  'earth': 0.3
+}
+
+// Road upgrades to calculate EAUL for.
+// These do not directly translate to road upgrade options available on the
+// frontend. Since the rehab of an asphalt road results in the same values as
+// upgrade to asphalt, it's not necessary calculate this twice.
 const ROAD_UPGRADES = [
-  'upgrade-gravel',
-  'upgrade-asphalt',
-  'rehab-earth',
-  'rehab-gravel',
-  'rehab-asphalt'
+  {
+    id: 'upgrade-rehab-asphalt',
+    ruc: newRuc['asphalt'],
+    speed: 1 / newRuc['asphalt'],
+    drainageCapacity: 1,
+    conditionRate: 1,
+    surface: 'paved',
+    condition: 'good'
+  },
+  {
+    id: 'upgrade-rehab-gravel',
+    ruc: newRuc['gravel'],
+    speed: 1 / newRuc['gravel'],
+    drainageCapacity: 1,
+    conditionRate: 1,
+    surface: 'unpaved',
+    condition: 'good'
+  },
+  {
+    id: 'rehab-earth',
+    ruc: newRuc['earth'],
+    speed: 1 / newRuc['earth'],
+    drainageCapacity: 1,
+    conditionRate: 1,
+    surface: 'unpaved',
+    condition: 'good'
+  }
 ];
 
 /**
@@ -174,22 +207,6 @@ async function getImpassableWays (retPeriod) {
 
     return (wlcc - wld * dc) > 0.5;
   });
-}
-
-/**
- * Returns the new speed for a way given an upgrade.
- * The speed is calculated with the formula: 1 / RUC
- *
- * @param {object} way  Way being upgraded.
- * @param {string} upgrade Upgrade to apply to the way.
- *                         Will be one of ROAD_UPGRADES
- *
- * @returns {number} New speed for way after the upgrade.
- */
-async function getUpgradeWaySpeed (way, upgrade) {
-  // TODO: Implement
-  const ruc = 0.04;
-  return 1 / ruc;
 }
 
 function osrmTable (osrm, opts) {
@@ -425,14 +442,12 @@ async function run (odPairs) {
     for (const upgrade of ROAD_UPGRADES) {
       tStart(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
 
-      clog('[UPGRADE WAYS] id, upgrade:', way.id, upgrade);
-      // Get new speeds for this upgraded way.
-      const speed = await getUpgradeWaySpeed(way, upgrade);
+      clog('[UPGRADE WAYS] id, upgrade:', way.id, upgrade.id);
 
       // Create a speed profile for the baseline.
       const speedProfileFile = `${workdir}/speed-upgrade-${way.id}.csv`;
       tStart(`[UPGRADE WAYS] ${way.id} traffic profile`)();
-      await createSpeedProfile(speedProfileFile, [way], speed);
+      await createSpeedProfile(speedProfileFile, [way], upgrade.speed);
       tEnd(`[UPGRADE WAYS] ${way.id} traffic profile`)();
 
       clog(`[UPGRADE WAYS] ${way.id} OSRM contract`);
@@ -445,18 +460,18 @@ async function run (odPairs) {
 
       // Prepare flood files for this way.
       clog(`[UPGRADE WAYS] ${way.id} Prepare OSRM flood`);
-      let floodOSRMFiles = await prepareFloodOSRMFiles(workdir, way, speed);
+      let floodOSRMFiles = await prepareFloodOSRMFiles(workdir, way, upgrade.speed);
 
       // Calculate the EAUL of all OD pairs for this way-upgrade combination.
       clog(`[UPGRADE WAYS] ${way.id} Calculate EAUL`);
       tStart(`[UPGRADE WAYS] ${way.id} calcEaul`)();
-      const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade}`);
+      const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade.id}`);
       tEnd(`[UPGRADE WAYS] ${way.id} calcEaul`)();
 
       const finalEAUL = baselineEAUL - wayUpgradeEAUL;
-      clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade}] the eaul is`, finalEAUL);
+      clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade.id}] the eaul is`, finalEAUL);
 
-      wayResult.eaul[upgrade] = finalEAUL;
+      wayResult.eaul[upgrade.id] = finalEAUL;
 
       tEnd(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
     }
