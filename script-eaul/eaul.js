@@ -78,11 +78,19 @@ const CONCURRENCY_FLOOD_OSRM = 5;
 const CONCURRENCY_FLOOD_EAUL = 5;
 
 const FLOOD_RETURN_PERIOD = [5, 10, 20, 50, 75, 100, 200, 250, 500, 1000];
+
+// TMP. To be replaced by FLOOD_REPAIRTIME based on road props
 const FLOOD_REPAIR_TIME = {
+  5: 5,
   10: 10,
   20: 20,
   50: 50,
-  100: 100
+  75: 75,
+  100: 100,
+  200: 200,
+  250: 250,
+  500: 500,
+  1000: 1000
 };
 
 // Flood repair time depends on three factors:
