@@ -6,7 +6,12 @@ import OSRM from 'osrm';
 import program from 'commander';
 
 import { tStart, tEnd, jsonToFile, initLog } from '../scripts/utils/logging';
-import { createSpeedProfile, osrmContract } from '../scripts/utils/utils';
+import {
+  createSpeedProfile,
+  osrmContract,
+  getRoadClass,
+  getSurface
+} from '../scripts/utils/utils';
 
 const { ROOT_DIR } = process.env;
 
@@ -171,6 +176,120 @@ const ROAD_UPGRADES = [
     condition: 'good'
   }
 ];
+class ODPairStatusTracker {
+  constructor () {
+    // Stores the unroutable pairs and the routable indexes for each group
+    // i.e. FLOOD_RETURN_PERIOD
+    this.groups = {};
+
+    // Flooding the network will make some OD pairs unroutable. When we run the
+    // eaul calculation for the 1st time we need to store which pairs become
+    // unroutable and disregard them on the subsequent calculations.
+    // It is not enough to check the routable flag because the pair may be
+    // routable on one of the flood return periods but not on the other.
+    // It is enough for one return period to be unroutable to have the pair
+    // removed from all calculations.
+    this.unroutableFloodedPairs = {
+      // [oIdx]-[dIdx]: true
+    };
+    // Store the indexes of the routable pairs to filter the OD pairs object
+    // on the upgrade runs.
+    this.routableIndexes = {
+      // [id]: true
+    };
+  }
+
+  initGroup () {
+    return {
+      unroutablePairs: [],
+      routableIndexes: []
+    };
+  }
+
+  /**
+   * Prepares the unroutable and routable indexes.
+   *
+   * @param {mixed} group Identifier of the group being prepared.
+   * @param {array} result Results from osrmTable()
+   */
+  prepare (group, result) {
+    if (!this.groups[group]) {
+      this.groups[group] = this.initGroup();
+    }
+    const g = this.groups[group];
+
+    let unPairs = [];
+    let rPairs = [];
+    result.forEach(o => {
+      if (o.routable) {
+        rPairs.push(o.oIdx, o.dIdx);
+      } else {
+        unPairs.push(`${o.oIdx}-${o.dIdx}`);
+      }
+    });
+    g.routableIndexes = g.routableIndexes.concat(rPairs);
+    g.unroutablePairs = g.unroutablePairs.concat(unPairs);
+
+    return this;
+  }
+
+  /**
+   * Computes the indexes used the data collected from the prepare() method.
+   */
+  finalize () {
+    clog('Computing unroutable pairs');
+    for (const key in this.groups) {
+      const group = this.groups[key];
+      // Stores the pairs that are unroutable.
+      group.unroutablePairs.forEach(o => { this.unroutableFloodedPairs[o] = true; });
+    }
+
+    // Note: We're assuming that number of flooded ways are incremental
+    // with the flood return period, i.e. A way that is flooded on the 1st
+    // flood return period will be flooded on the 2nd, 3rd and so on.
+    // Therefore to know which ways are always availabe we look at the last
+    // flood return period.
+    const lastFlood = FLOOD_RETURN_PERIOD[FLOOD_RETURN_PERIOD.length - 1];
+    this.groups[lastFlood].routableIndexes.forEach(o => { this.routableIndexes[o] = true; });
+
+    return this;
+  }
+
+  /**
+   * Dumps the unroutable pairs to destination file.
+   *
+   * @param {array} odPairs Od pairs list.
+   * @param {string} dest Path for unroutable file.
+   */
+  unroutableToFile (odPairs, dest) {
+    // Dump unroutable pairs to file.
+    const dump = Object.keys(this.unroutableFloodedPairs).map(o => {
+      const [oIdx, dIdx] = o.split('-');
+      return [ odPairs[oIdx], odPairs[dIdx] ];
+    });
+    jsonToFile(dest)(dump);
+  }
+
+  /**
+   * Filters input RUC data according to unroutable pairs index.
+   *
+   * @param {array} rucData Ruc data as given by osrmTable()
+   */
+  filterRUCData (rucData) {
+    return rucData.filter(odPair => !this.unroutableFloodedPairs[`${odPair.oIdx}-${odPair.dIdx}`]);
+  }
+
+  /**
+   * Filters input OD pairs accordind the the routable index.
+   *
+   * @param {array} odPairs List of OD pairs.
+   */
+  filterRoutableODPairs (odPairs) {
+    return odPairs.filter((odPair, idx) => this.routableIndexes[idx]);
+  }
+}
+
+const odPairStatusTracker = new ODPairStatusTracker();
 
 /**
  * Returns the ways that become impassable for a given flood return period.
@@ -224,6 +343,54 @@ function getImpassableWays (retPeriod, upgradeWay, upgrade) {
  */
 function getUpgradeWaySpeed (way, upgrade) {
   return upgrade.speed;
+}
+
+/**
+ * Calculates the repair time given a flood return period.
+ *
+ * @param {number} retPeriod Flood return period.
+ *
+ * @uses floodDepth   Object with flood depths per road per return period
+ *                    {"N1-T8083": {"10": 2.06, "20": 2.29}, "R441-T5116": {"10": 0.26, "20": 0.41}}
+ *
+ * @returns {number} The repair time.
+ */
+function calcFloodRepairTime (retPeriod) {
+  // Calculate flood repair time `r`.
+  // Get the impassable ways for this flood return period.
+  // Calculate the repair time for each one and get the max.
+  const impassableWays = getImpassableWays(retPeriod);
+
+  const repairTime = impassableWays.reduce((max, way) => {
+    // Get Wlcc for this way, for the return period.
+    const wlcc = floodDepth[way.tags.NAME][retPeriod];
+
+    let severity = 'low';
+    if (wlcc > 0.5 && wlcc <= 1.5) severity = 'medium';
+    if (wlcc > 1.5) severity = 'high';
+
+    const roadSurface = getSurface(way.tags);
+    const roadClass = getRoadClass(way.tags);
+    const wayLen = parseFloat(way.tags.Length) / 1000;
+
+    const rTime = wayLen * FLOOD_REPAIRTIME[severity][roadSurface][roadClass];
+    return Math.max(rTime, max);
+  }, 0);
+
+  return repairTime;
+}
+
+/**
+ * Calculates the traffic between the origin and destination.
+ *
+ * @param {object} origin Origin point.
+ * @param {object} destination Destination point.
+ *
+ * @returns {number} OD pair traffic.
+ */
+function getODPairTraffic (origin, destination) {
+  // TODO: Implement
+  return 10;
 }
 
 /**
@@ -347,35 +514,6 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgrade) {
 }
 
 /**
- * Calculates the repair time given a flood return period.
- *
- * @param {number} retPeriod Flood return period.
- *
- * @returns {number} The repair time.
- */
-function calcFloorRepairTime (retPeriod) {
-  // TODO:
-  // Calculate flood repair time `r`.
-  // Get the impassable ways for this flood return period.
-  // Calculate the repair time for each one and get the max.
-  const impassableWays = getImpassableWays(retPeriod);
-  return impassableWays.length;
-}
-
-/**
- * Calculates the traffic between the origin and destination.
- *
- * @param {object} origin Origin point.
- * @param {object} destination Destination point.
- *
- * @returns {number} OD pair traffic.
- */
-function getODPairTraffic (origin, destination) {
-  // TODO: Implement
-  return 10;
-}
-
-/**
  * Calculates the increased user cost for a given return period using
  * the formula:
  * Ui = ri * SUM od pairs (RUC ODi - RUC ODbase) * tOD
@@ -389,7 +527,7 @@ function getODPairTraffic (origin, destination) {
  */
 function calcIncreasedUserCost (retPeriod, odPairs, baselineRUC, odPairsFloodRUC) {
   // Flood repair time.
-  const r = calcFloorRepairTime(retPeriod);
+  const r = calcFloodRepairTime(retPeriod);
   const sum = odPairsFloodRUC.reduce((acc, odPairRUC, idx) => {
     const origin = odPairs[odPairRUC.oIdx];
     const destination = odPairs[odPairRUC.dIdx];
@@ -399,7 +537,6 @@ function calcIncreasedUserCost (retPeriod, odPairs, baselineRUC, odPairsFloodRUC
   return r * sum;
 }
 
-let unroutableFloodedPairs = {};
 /**
  * Calculates the Expected Annual User Loss for all OD pairs.
  * To do this it uses a formula that relates the RUC of the baseline RN
@@ -407,6 +544,8 @@ let unroutableFloodedPairs = {};
  *
  * @param {string} osrmFolder Path to the osrm folder to use.
  * @param {array} odPairs OD Pairs to use.
+ * @param {object} floodOSRMFiles Flood OSRM files path.
+ * @param {string} identifier Unique id for the execution.
  *
  * @uses getFloodOSRMFile()
  * @uses osrmTable()
@@ -420,17 +559,6 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
   const baselineRUC = await osrmTable(osrm, {coordinates: coords});
   jsonToFile(`${LOG_DIR}/no-flood--${identifier}.json`)(baselineRUC);
 
-  // Flooding the network will make some OD pairs unroutable. When we run the
-  // eaul calculation for the 1st time we need to store which pairs become
-  // unroutable and disregard them on the subsequent calculations.
-  // It is not enough to check the routable flag because the pair may be
-  // routable on one of the flood return periods but not on the other.
-  // It is enough for one return period to be unroutable to have the pair
-  // removed from all calculations.
-  // The unroutableFloodedPairs variable is stored as a global since it has to
-  // mutated by the first run which we identify by the 'all' identifier param.
-  let unroutablePairs = [];
-
   // Calculate RUC on a flooded RN depending on the flood return period.
   // The calculation of the RUC  need to be separate from the rest because we
   // need to have all the unroutable pairs so we know which ones to exclude when
@@ -442,32 +570,24 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
 
     // Global run.
     if (identifier === 'all') {
-      const pairs = result.filter(o => !o.routable).map(o => `${o.oIdx}-${o.dIdx}`);
-      unroutablePairs = unroutablePairs.concat(pairs);
+      odPairStatusTracker.prepare(retPeriod, result);
     }
+
     return result;
   }, {concurrency: CONCURRENCY_FLOOD_EAUL});
 
   // Create the unroutable pairs index.
-  // NOTE: mutating global variable. See above.
   if (identifier === 'all') {
-    clog('Computing unroutable pairs');
-    unroutablePairs.forEach(o => { unroutableFloodedPairs[o] = true; });
-    // Dump unroutable pairs to file.
-    const dump = Object.keys(unroutableFloodedPairs).map(o => {
-      const [oIdx, dIdx] = o.split('-');
-      return [ odPairs[oIdx], odPairs[dIdx] ];
-    });
-    jsonToFile(`${RESULTS_DIR}/unroutable-pairs.json`)(dump);
+    odPairStatusTracker
+      .finalize()
+      .unroutableToFile(odPairs, `${RESULTS_DIR}/unroutable-pairs.json`);
   }
-
   // Filter unroutable pairs from the odPairsFloodsRUC list.
   const odPairsFloodRUCFiltered = odPairsFloodsRUC.map(floodRUCData => {
-    // Filter if is on the index.
-    return floodRUCData.filter(odPair => !unroutableFloodedPairs[`${odPair.oIdx}-${odPair.dIdx}`]);
+    return odPairStatusTracker.filterRUCData(floodRUCData);
   });
   // Filter unroutable pairs from the baseline ruc list as well.
-  const baselineRUCFiltered = baselineRUC.filter(odPair => !unroutableFloodedPairs[`${odPair.oIdx}-${odPair.dIdx}`]);
+  const baselineRUCFiltered = odPairStatusTracker.filterRUCData(baselineRUC);
 
   // EAUL formula. (page 15 of paper):
   // EUAL = 1/2 * SUM flood period[i=1 -> n] (1 / Ti - 1/Ti+1) (Ui + Ui+1)

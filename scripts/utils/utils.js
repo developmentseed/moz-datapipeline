@@ -138,19 +138,25 @@ export function addScaledScore (data) {
 
 // Sensible defaults for road properties
 export function getRoadClass (road) {
-  let roadClass = road.properties.ROAD_CLASS.toLowerCase();
+  // If there's a properties object use that, otherwise assume it's root.
+  const props = road.properties || road;
+  let roadClass = props.ROAD_CLASS.toLowerCase();
   if (roadClass === 'n/a') return 'secondary';
   return roadClass;
 }
 
 export function getSurface (road) {
-  let surfType = road.properties.SURF_TYPE.toLowerCase();
+  // If there's a properties object use that, otherwise assume it's root.
+  const props = road.properties || road;
+  let surfType = props.SURF_TYPE.toLowerCase();
   if (surfType === 'paved' || surfType === 'unpaved') return surfType;
   return 'unpaved';
 }
 
 export function getRoadCondition (road) {
-  let avgCond = road.properties.AVG_COND.toLowerCase();
+  // If there's a properties object use that, otherwise assume it's root.
+  const props = road.properties || road;
+  let avgCond = props.AVG_COND.toLowerCase();
   if (avgCond === 'very poor' || avgCond === 'n/a') return 'poor';
   return avgCond;
 }
