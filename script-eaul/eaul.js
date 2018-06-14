@@ -77,12 +77,20 @@ const CONCURRENCY_FLOOD_OSRM = 5;
 // How many OD Pair eaul calculations to run simultaneously.
 const CONCURRENCY_OD_PAIRS = 5;
 
-const FLOOD_RETURN_PERIOD = [10, 20, 50, 100];
+const FLOOD_RETURN_PERIOD = [5, 10, 20, 50, 75, 100, 200, 250, 500, 1000];
+
+// TMP. To be replaced by FLOOD_REPAIRTIME based on road props
 const FLOOD_REPAIR_TIME = {
+  5: 5,
   10: 10,
   20: 20,
   50: 50,
-  100: 100
+  75: 75,
+  100: 100,
+  200: 200,
+  250: 250,
+  500: 500,
+  1000: 1000
 };
 
 // Flood repair time depends on three factors:
@@ -137,10 +145,45 @@ const FLOOD_REPAIRTIME = {
 // The return period roads are designed for
 const ROAD_DESIGNSTANDARD = 20;
 
+// New RUC
+const newRuc = {
+  'asphalt': 0.23,
+  'gravel': 0.27,
+  'earth': 0.3
+}
+
+// Road upgrades to calculate EAUL for.
+// These do not directly translate to road upgrade options available on the
+// frontend. Since rehab of asphalt and upgrade to asphalt result in the exact
+// same road, it's not necessary calculate this twice.
 const ROAD_UPGRADES = [
-  'one',
-  'two',
-  'three'
+  {
+    id: 'upgrade-rehab-asphalt',
+    ruc: newRuc['asphalt'],
+    speed: 1 / newRuc['asphalt'],
+    drainageCapacity: 1,
+    conditionRate: 1,
+    surface: 'paved',
+    condition: 'good'
+  },
+  {
+    id: 'upgrade-rehab-gravel',
+    ruc: newRuc['gravel'],
+    speed: 1 / newRuc['gravel'],
+    drainageCapacity: 1,
+    conditionRate: 1,
+    surface: 'unpaved',
+    condition: 'good'
+  },
+  {
+    id: 'rehab-earth',
+    ruc: newRuc['earth'],
+    speed: 1 / newRuc['earth'],
+    drainageCapacity: 1,
+    conditionRate: 1,
+    surface: 'unpaved',
+    condition: 'good'
+  }
 ];
 
 tStart(`Create lookup tables`)();
@@ -182,7 +225,7 @@ tEnd(`Create lookup tables`)();
  * @param {number} retPeriod  Flood return period.
  *                            Will be one of FLOOD_RETURN_PERIOD
  * @param {object} upgradeWay Way that is going to be upgraded.
- * @param {number} upgrade    Upgrade to be performed on the way
+ * @param {object} upgrade    Object with impact of road upgrade.
  *
  * @uses floodDepth   Object with flood depths per road per return period
  *                    {"N1-T8083": {"10": 2.06, "20": 2.29}, "R441-T5116": {"10": 0.26, "20": 0.41}}
@@ -191,38 +234,18 @@ tEnd(`Create lookup tables`)();
  * @returns {array} List of ways that are impassable.
  */
 async function getImpassableWays (retPeriod, upgradeWay, upgrade) {
-  // return allWaysList;
   return allWaysList.filter(way => {
-    if (upgradeWay && upgradeWay.id === way.id) {
-      // TODO: Account for upgrade.
-    }
     // Get Wlcc for this way, for the return period.
     let wlcc = floodDepth[way.tags.NAME][retPeriod];
 
     // Get Water Level that this road was designed for.
     let wld = floodDepth[way.tags.NAME][ROAD_DESIGNSTANDARD];
 
-    // Drainage capacity rate is set to default 0.7
-    let dc = 0.7;
+    // Default drainage capacity is 0.7, unless road is upgraded
+    let dc = upgradeWay && way.id === upgradeWay.id ? upgrade.drainageCapacity : 0.7;
 
     return (wlcc - wld * dc) > 0.5;
   });
-}
-
-/**
- * Returns the new speed for a way given an upgrade.
- * The speed is calculated with the formula: 1 / RUC
- *
- * @param {object} way  Way being upgraded.
- * @param {string} upgrade Upgrade to apply to the way.
- *                         Will be one of ROAD_UPGRADES
- *
- * @returns {number} New speed for way after the upgrade.
- */
-async function getUpgradeWaySpeed (way, upgrade) {
-  // TODO: Implement
-  const ruc = 0.04;
-  return 1 / ruc;
 }
 
 /**
@@ -241,6 +264,57 @@ function osrmRoute (osrm, opts) {
 }
 
 /**
+ * Promise version of osrm.table()
+ *
+ * @param {osrm} osrm The OSRM instance.
+ * @param {object} opts Options to pass to the route method.
+ */
+function osrmTable (osrm, opts) {
+  return new Promise((resolve, reject) => {
+    osrm.table(opts, (err, res) => {
+      if (err) return reject(err);
+
+      // Create origin destination array.
+      const table = res.durations;
+      const len = table.length;
+      var result = [];
+
+      // For loops, not as pretty but fast.
+      for (let rn = 0; rn < len - 1; rn++) {
+        for (let cn = rn + 1; cn < len; cn++) {
+          // Going from A to B may yield a different value than going from
+          // B to A. For some reason if the starting point is near a road that
+          // is ignored (with the speed profile) it will be marked and
+          // unroutable and null is returned.
+          let ab = table[rn][cn];
+          let ba = table[cn][rn];
+
+          // When the closest segment to A or B is the one ignored, the route
+          // should be considered unroutable. This will solve the cases
+          // outlined in https://github.com/developmentseed/moz-datapipeline/issues/7#issuecomment-363153755
+          if (ab === null || ba === null) {
+            result.push({
+              oIdx: rn,
+              dIdx: cn,
+              routable: false,
+              ruc: null
+            });
+          } else {
+            result.push({
+              oIdx: rn,
+              dIdx: cn,
+              routable: true,
+              ruc: Math.max(ab, ba) / 3600
+            });
+          }
+        }
+      }
+      return resolve(result);
+    });
+  });
+}
+
+/**
  * Creates a osrm file for each return period ignoring the segments that
  * get flooded on that return period. To ignore the segments the speed between
  * nodes is set to 0.
@@ -250,7 +324,7 @@ function osrmRoute (osrm, opts) {
  * @param {string} wdir Working directory. Defaults to TMP_DIR
  * @param {string} osrmFolder Path to the baseline OSRM
  * @param {object} upgradeWay Way that is going to be upgraded.
- * @param {number} upgrade Upgrade to be performed on the way
+ * @param {object} upgrade Object with impact of road upgrade.
  *
  * @returns OSRM file paths for flood files.
  */
@@ -278,10 +352,9 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgrade) {
 
     // If there is a way to upgrade, update the speed profile accordingly.
     if (upgradeWay) {
-      const upgradeSpeed = await getUpgradeWaySpeed(upgradeWay, upgrade);
-      // tStart(`[IGNORE WAYS] ${identifier} ${retPeriod} traffic profile upgrade`)();
-      await createSpeedProfile(speedProfileFile, [upgradeWay], upgradeSpeed, true);
-      // tEnd(`[IGNORE WAYS] ${identifier} ${retPeriod} traffic profile upgrade`)();
+      // tStart(`[IGNORE WAYS] ${retPeriod} traffic profile upgrade`)();
+      await createSpeedProfile(speedProfileFile, [upgradeWay], upgrade.speed, true);
+      // tEnd(`[IGNORE WAYS] ${retPeriod} traffic profile upgrade`)();
     }
 
     // tStart(`[IGNORE WAYS] ${identifier} ${retPeriod} osm-contract`)();
@@ -411,8 +484,11 @@ async function calcEaul (osrmFolder, origin, destination, floodOSRMFiles) {
   const increaseUCost = await Promise.map(FLOOD_RETURN_PERIOD, async (retPeriod) => {
     const floodOSRM = floodOSRMFiles[retPeriod];
     const {ruc, ways} = await calcRoute(floodOSRM, origin, destination);
+
     // TODO: Add od pair traffic.
-    return FLOOD_REPAIR_TIME[retPeriod] * (ruc - odPairRes.ruc) * 1;
+    let trafficOd = 100;
+
+    return FLOOD_REPAIR_TIME[retPeriod] * (ruc - odPairRes.ruc) * trafficOd;
   }, {concurrency: 5});
 
   clog('increased user cost', increaseUCost);
@@ -467,6 +543,24 @@ async function calcRoute (osrmFolder, origin, destination) {
   return {ruc, ways};
 }
 
+/**
+ * Calculates the routes for an array of OD pairs. Return the RUC.
+ *
+ * @param {string} osrmFolder Path to the osrm folder to use.
+ * @param {array}  odPairs for the routes.
+ * @param {object} destination Destination for the route.
+ *
+ * @uses osrmTable()
+ */
+async function calcRoutes (osrmFolder, odPairs) {
+  // Extract all the coordinates for osrm
+  const coords = odPairs.map(feat => feat.geometry.coordinates);
+
+  var osrm = new OSRM({ path: `${OSRM_FOLDER}/roadnetwork.osrm`, algorithm: 'CH' });
+
+  return osrmTable(osrm, {coordinates: coords});
+}
+
 //
 //               (^.^)
 // RUN function below - Main entry point.
@@ -476,36 +570,24 @@ async function run (odPairs) {
   clog('[baseline] Prepare OSRM flood');
   let floodOSRMFiles = await prepareFloodOSRMFiles();
 
+  // Calculate RUC for each OD pair without disruption.
+  tStart(`[baseline] Baseline RUC for all OD pairs`)();
+  const baselineRuc = await calcRoutes(OSRM_FOLDER, odPairs)
+  tEnd(`[baseline] Baseline RUC for all OD pairs`)();
+
   // Create the unroutable pairs index.
   // Unroutable pairs will be stored like [oIdx-dIdx] = true because it
   // will be very fast to find the values.
   // https://github.com/developmentseed/moz-datapipeline/issues/26#issuecomment-389957802
-  let unroutableFloodedPairs = {};
-
-  // Calculate the baseline EAUL for the RN.
-  let baselineEAUL = 0;
-  // For each od api combination.
-  await forEachArrayCombination(odPairs, async (origin, destination, oIdx, dIdx) => {
-    clog('[baseline] Origin', origin.properties.Name);
-    clog('[baseline] Destination', destination.properties.Name);
-    tStart(`[baseline] ${oIdx}-${dIdx} EAUL od pair`)();
-    // Calculate EAUL (Expected Annual User Loss) for this OD pair.
-    let odPairEaul;
-    try {
-      odPairEaul = await calcEaul(OSRM_FOLDER, origin, destination, floodOSRMFiles);
-    } catch (e) {
-      if (e.message === 'Unroutable OD Pair') {
-        clog('[baseline] Found unroutable OD Pair');
-        unroutableFloodedPairs[`${oIdx}-${dIdx}`] = true;
-        odPairEaul = 0; // 0 and continue.
+  let unroutableFloodedPairs = baselineRuc
+    .filter(od => !od.routable)
+    .map(od => {
+      let odPairKey = `${od.oIdx}-${od.dIdx}`
+      return {
+        odPairKey: true
       }
-    }
-    tEnd(`[baseline] ${oIdx}-${dIdx} EAUL od pair`)();
-    clog(`[baseline] ${oIdx}-${dIdx} EAUL`, odPairEaul);
-    clog('');
-    baselineEAUL += odPairEaul;
-  }, CONCURRENCY_OD_PAIRS);
-  clog('[baseline] EAUL', baselineEAUL);
+    });
+
   clog('Unroutable pairs found:', Object.keys(unroutableFloodedPairs).length);
 
   // Dump unroutable pairs to file.
@@ -539,14 +621,12 @@ async function run (odPairs) {
     for (const upgrade of ROAD_UPGRADES) {
       tStart(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
 
-      clog('[UPGRADE WAYS] id, upgrade:', way.id, upgrade);
-      // Get new speeds for this upgraded way.
-      const speed = await getUpgradeWaySpeed(way, upgrade);
+      clog('[UPGRADE WAYS] id, upgrade:', way.id, upgrade.id);
 
       // Create a speed profile for the baseline.
       const speedProfileFile = `${workdir}/speed-upgrade-${way.id}.csv`;
       tStart(`[UPGRADE WAYS] ${way.id} traffic profile`)();
-      await createSpeedProfile(speedProfileFile, [way], speed);
+      await createSpeedProfile(speedProfileFile, [way], upgrade.speed);
       tEnd(`[UPGRADE WAYS] ${way.id} traffic profile`)();
 
       clog(`[UPGRADE WAYS] ${way.id} OSRM contract`);
@@ -562,6 +642,7 @@ async function run (odPairs) {
       let floodOSRMFiles = await prepareFloodOSRMFiles(workdir, way, upgrade);
 
       clog(`[UPGRADE WAYS] ${way.id} Calculate EAUL`);
+
       // Calculate the baseline EAUL for the RN.
       let wayUpgradeEAUL = 0;
       // For each od api combination.
@@ -582,9 +663,9 @@ async function run (odPairs) {
       }, CONCURRENCY_OD_PAIRS);
 
       const finalEAUL = baselineEAUL - wayUpgradeEAUL;
-      clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade}] the eaul is`, finalEAUL);
+      clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade.id}] the eaul is`, finalEAUL);
 
-      wayResult.eaul[upgrade] = finalEAUL;
+      wayResult.eaul[upgrade.id] = finalEAUL;
 
       tEnd(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
     }
