@@ -25,7 +25,7 @@ Usage: script-eaul [options] <source-dir>
 
 ## Running with docker
 When the script is ran inside the container it follows these steps:
-- Downloads the RN and the OD pairs
+- Downloads the RN, the OD pairs, flood and traffic information
 - Creates a way index file from the RN
 - Creates the OSRM
 - Runs the node eaul script

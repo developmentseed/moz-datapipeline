@@ -37,6 +37,9 @@ aws s3 cp s3://$S3_BUCKET/eaul/roadnetwork.osm roadnetwork.osm
 echo "Download file with flood depths"
 aws s3 cp s3://$S3_BUCKET/fluvial-pluvial/current/roadnetwork_stats.json flood-depths-current.json
 
+echo "Download file traffic information"
+aws s3 cp s3://$S3_BUCKET/fluvial-pluvial/current/traffic.json traffic.json
+
 # Create ways index
 echo "Creating way index"
 node /var/pipeline/scripts/utils/extract-ways.js /var/pipeline/.tmp
