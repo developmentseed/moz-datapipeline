@@ -29,10 +29,10 @@ if (!TRAFFIC_FILE) {
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
+const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/process-traffic');
 
-const OUTPUT_FILE = path.resolve(OUTPUT_DIR, 'traffic.json');
+const OUTPUT_FILE = path.resolve(TMP_DIR, 'traffic.json');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -100,7 +100,7 @@ async function run (trafficFile) {
 (async function main () {
   try {
     await Promise.all([
-      fs.ensureDir(OUTPUT_DIR),
+      fs.ensureDir(TMP_DIR),
       fs.ensureDir(LOG_DIR)
     ]);
 
