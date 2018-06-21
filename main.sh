@@ -39,6 +39,6 @@ bash scripts/criticality/criticality.sh
 node ./scripts/merge-indicators/index.js
 
 # Attach eaul processing results
-bash scripts/merge-eaul/eaul.sh
+# bash scripts/merge-eaul/eaul.sh
 
 # rm -r .tmp/*
