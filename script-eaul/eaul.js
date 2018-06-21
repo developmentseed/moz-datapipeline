@@ -46,7 +46,7 @@ if (program.args.length !== 1) {
 // Config Vars
 
 const SOURCE_DIR = program.args[0];
-const TMP_DIR = path.resolve(SOURCE_DIR, 'workdir');
+const TMP_DIR = path.resolve(SOURCE_DIR, 'eaul-workdir');
 const LOG_DIR = program.L || path.resolve(TMP_DIR, 'logs');
 const RESULTS_DIR = program.O || path.resolve(TMP_DIR, 'results');
 
@@ -54,15 +54,18 @@ const OD_FILE = path.resolve(SOURCE_DIR, 'od.geojson');
 const OSRM_FOLDER = path.resolve(SOURCE_DIR, 'osrm');
 const WAYS_FILE = path.resolve(SOURCE_DIR, 'roadnetwork-osm-ways.json');
 const FLOOD_DEPTH_FILE = path.resolve(SOURCE_DIR, 'flood-depths-current.json');
+const TRAFFIC_FILE = path.resolve(SOURCE_DIR, 'traffic.json');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Using OD Pairs', OD_FILE);
 clog('Using RN Ways', WAYS_FILE);
 clog('Using Flood depth', FLOOD_DEPTH_FILE);
+clog('Using Traffic', TRAFFIC_FILE);
 const odPairs = fs.readJsonSync(OD_FILE);
 var allWaysList = fs.readJsonSync(WAYS_FILE);
 const floodDepth = fs.readJsonSync(FLOOD_DEPTH_FILE);
+const trafficData = fs.readJsonSync(TRAFFIC_FILE);
 
 // Filter ways according to input.
 var waysList = program.ways ? allWaysList.filter(w => program.ways[w.id]) : allWaysList;
@@ -177,7 +180,7 @@ const ROAD_UPGRADES = [
   }
 ];
 class ODPairStatusTracker {
-  constructor () {
+  constructor (odPairs) {
     // Stores the unroutable pairs and the routable indexes for each group
     // i.e. FLOOD_RETURN_PERIOD
     this.groups = {};
@@ -197,6 +200,18 @@ class ODPairStatusTracker {
     this.routableIndexes = {
       // [id]: true
     };
+    // Store the od pairs that have no traffic. There's no need to perform
+    // calculations for those.
+    // Store as [oIdx]-[dIdx]: true
+    this.noTrafficPairs = trafficData.reduce((acc, pair) => {
+      const total = pair.dailyODCount + pair.reverseODCount;
+      if (total === 0) {
+        const oIdx = odPairs.findIndex(el => el.properties.OBJECTID === pair.origin);
+        const dIdx = odPairs.findIndex(el => el.properties.OBJECTID === pair.destination);
+        acc[`${oIdx}-${dIdx}`] = true;
+      }
+      return acc;
+    }, {});
   }
 
   initGroup () {
@@ -276,7 +291,10 @@ class ODPairStatusTracker {
    * @param {array} rucData Ruc data as given by osrmTable()
    */
   filterRUCData (rucData) {
-    return rucData.filter(odPair => !this.unroutableFloodedPairs[`${odPair.oIdx}-${odPair.dIdx}`]);
+    return rucData.filter(odPair => {
+      const id = `${odPair.oIdx}-${odPair.dIdx}`;
+      return !this.unroutableFloodedPairs[id] && !this.noTrafficPairs[id];
+    });
   }
 
   /**
@@ -288,8 +306,8 @@ class ODPairStatusTracker {
     return odPairs.filter((odPair, idx) => this.routableIndexes[idx]);
   }
 }
-
-const odPairStatusTracker = new ODPairStatusTracker();
+// Initialized in run().
+let odPairStatusTracker;
 
 /**
  * Returns the ways that become impassable for a given flood return period.
@@ -389,8 +407,10 @@ function calcFloodRepairTime (retPeriod) {
  * @returns {number} OD pair traffic.
  */
 function getODPairTraffic (origin, destination) {
-  // TODO: Implement
-  return 10;
+  const oId = origin.properties.OBJECTID;
+  const dId = destination.properties.OBJECTID;
+  const traffic = trafficData.find(o => o.origin === oId && o.destination === dId);
+  return traffic.dailyODCount + traffic.reverseODCount;
 }
 
 /**
@@ -456,8 +476,8 @@ function osrmTable (osrm, opts) {
  * Creates a osrm file for each return period ignoring the segments that
  * get flooded on that return period. To ignore the segments the speed between
  * nodes is set to 0.
- * If an upgradeWay is provided, the given speed is added to the profile file
- * for the nodes in that way.
+ * If an upgradeWay is provided, the new speed for that way is calculated and
+ * added to the profile file for the nodes in that way.
  *
  * @param {string} wdir Working directory. Defaults to TMP_DIR
  * @param {string} osrmFolder Path to the baseline OSRM
@@ -552,10 +572,10 @@ function calcIncreasedUserCost (retPeriod, odPairs, baselineRUC, odPairsFloodRUC
  * @uses {object} unroutableFloodedPairs
  */
 async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all') {
-  // Extract all the coordinates for osrm
+  // Extract all the coordinates for osrm.
   const coords = odPairs.map(feat => feat.geometry.coordinates);
 
-  var osrm = new OSRM({ path: `${OSRM_FOLDER}/roadnetwork.osrm`, algorithm: 'CH' });
+  var osrm = new OSRM({ path: `${osrmFolder}/roadnetwork.osrm`, algorithm: 'CH' });
   const baselineRUC = await osrmTable(osrm, {coordinates: coords});
   jsonToFile(`${LOG_DIR}/no-flood--${identifier}.json`)(baselineRUC);
 
@@ -568,7 +588,7 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
     var osrm = new OSRM({ path: `${floodOSRM}/roadnetwork.osrm`, algorithm: 'CH' });
     const result = await osrmTable(osrm, {coordinates: coords});
 
-    // Global run.
+    // Global run. Track the OD Pairs that are unroutable.
     if (identifier === 'all') {
       odPairStatusTracker.prepare(retPeriod, result);
     }
@@ -619,6 +639,8 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
 // RUN function below - Main entry point.
 
 async function run (odPairs) {
+  odPairStatusTracker = new ODPairStatusTracker(odPairs);
+
   // Prepare the OSRM files per flood return period.
   clog('[baseline] Prepare OSRM flood');
   let floodOSRMFiles = await prepareFloodOSRMFiles();
@@ -664,9 +686,6 @@ async function run (odPairs) {
       await osrmContract(osrmUpFolder, speedProfileFile, way.id, {ROOT_DIR, LOG_DIR});
       tEnd(`[UPGRADE WAYS] ${way.id} osm-contract`)();
 
-      // Speed profile file is no longer needed.
-      fs.remove(speedProfileFile);
-
       // Prepare flood files for this way.
       clog(`[UPGRADE WAYS] ${way.id} Prepare OSRM flood`);
       let floodOSRMFiles = await prepareFloodOSRMFiles(workdir, way, upgrade);
@@ -686,6 +705,9 @@ async function run (odPairs) {
       tEnd(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
     }
     await jsonToFile(`${RESULTS_DIR}/result--${way.tags.NAME}.json`)(wayResult);
+    // We're done with this way. Remove the workdir to free space.
+    // Includes osrm upgraded, flood osrms, speed profile.
+    fs.remove(workdir);
     tEnd(`[UPGRADE WAYS] ${way.id} FULL`)();
   }, {concurrency: CONCURRENCY_WAYS});
 }
