@@ -48,6 +48,7 @@ checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
 checkRequiredFile './source/agriculture' '*.shp' AG_FILE
 checkRequiredFile './source/od-pairs' '*.shp' OD_FILE
+checkRequiredFile './source/traffic_matrix.csv' OD_TRAFFIC_FILE
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
@@ -197,11 +198,14 @@ node ./scripts/filter-percentile ./.tmp/agriculture-centroid.geojson ./.tmp/agri
 ###############################################################################
 #
 # 6. Generate OD pair data
+#     - convert the OD shapefile to GeoJSON
+#     - convert a traffic matrix in CSV format to JSON records
 #
 
 echo "Preparing OD data..."
 
 ogr2ogr -f "GeoJSON" $TMP_DIR/od.geojson $OD_FILE
+node ./scripts/process-traffic ./source/od-pairs/traffic_matrix.csv
 
 echo "All done preparing the OD data."
 

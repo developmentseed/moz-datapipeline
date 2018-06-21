@@ -1862,10 +1862,11 @@ csv2geojson@^5.0.2:
     optimist "~0.6.1"
     sexagesimal "0.5.0"
 
-csvtojson@^1.1.9:
-  version "1.1.12"
-  resolved "https://registry.yarnpkg.com/csvtojson/-/csvtojson-1.1.12.tgz#3872eef9588080f74c222ffe53cfdd416f9bb7d5"
+csvtojson@^2.0.4:
+  version "2.0.4"
+  resolved "https://registry.yarnpkg.com/csvtojson/-/csvtojson-2.0.4.tgz#f2fee7cd5057f01acc1620c85f3cf4d19c9305b0"
   dependencies:
+    bluebird "^3.5.1"
     lodash "^4.17.3"
     strip-bom "^2.0.0"
 
