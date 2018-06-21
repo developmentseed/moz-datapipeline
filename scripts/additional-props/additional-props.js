@@ -77,12 +77,17 @@ function addFloodInfo (way, floods) {
   way.properties.floods = returnPeriods.map(r => round(wayFloods[r]));
 }
 
+function scaleRUC (way) {
+  way.properties.RUC = 5.7762 * way.properties.RUC - 0.0334;
+}
+
 function run (rnData, floods) {
   rnData.features.forEach(way => {
     addWayLength(way);
     addWayProvince(way);
     addBridgeInfo(way);
     addFloodInfo(way, floods);
+    scaleRUC(way);
   });
 
   return rnData;
