@@ -35,10 +35,13 @@ node ./scripts/indicator-from-prop/index.js AADT
 # Calculate link criticality
 bash scripts/criticality/criticality.sh
 
+# Backup RN before adding indicators
+cp $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork_no-indi.geojson
+
 # Attach indicators to RN
 node ./scripts/merge-indicators/index.js
 
-# Attach eaul processing results
-# bash scripts/merge-eaul/eaul.sh
+# Copy RN to output folder
+cp $TMP_DIR/roadnetwork.geojson ./output/roadnetwork.geojson
 
 # rm -r .tmp/*

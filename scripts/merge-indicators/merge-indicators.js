@@ -25,7 +25,6 @@ const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 
 const RN_FILE = path.resolve(TMP_DIR, 'roadnetwork.geojson');
-const OUTPUT_RN_FILE = path.resolve(OUTPUT_DIR, 'roadnetwork-indicators.geojson');
 
 // Number of concurrent operations to run.
 const CONCURR_OPS = 5;
@@ -53,7 +52,7 @@ async function run () {
     tEnd(`Indicator ${file} total`)();
   }, {concurrency: CONCURR_OPS});
 
-  await fs.writeFile(OUTPUT_RN_FILE, JSON.stringify(rnData));
+  await fs.writeFile(RN_FILE, JSON.stringify(rnData));
 }
 
 /**
@@ -87,13 +86,12 @@ function attachIndicatorToRN (filePath) {
     const [, indName] = filePath.match(/indicator-(.*).csv/);
     const indId = camelcase(indName);
 
-    const readStream = fs.createReadStream(filePath);
     // Keep a list of visited features to list any missing.
     var visited = [];
     var nonExistent = [];
     csv()
-      .fromStream(readStream)
-      .on('json', json => {
+      .fromFile(filePath)
+      .subscribe(json => {
         let feat = rnData.features.find(f => f.properties.NAME === json.way_id);
         if (!feat) {
           nonExistent.push(json.way_id);

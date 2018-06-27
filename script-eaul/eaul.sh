@@ -11,7 +11,7 @@ CONTROL=true
 ENV_VARS="S3_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY WAY_IDS ROOT_DIR"
 
 for v in $ENV_VARS; do
-  if [ -z ${!v} ]; then
+  if [ -z "${!v}" ]; then
       echo "Missing env variable: $v"
       CONTROL=false
   fi

@@ -88,7 +88,6 @@ async function run (ways, odPairs) {
     return data;
   }, {concurrency: CONCURR_OPS});
 
-  clog('changes', result.filter(o => o.time > 0));
   clog('data length', result.length);
 
   // Calculate score (0 - 100)

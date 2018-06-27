@@ -48,7 +48,7 @@ checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
 checkRequiredFile './source/agriculture' '*.shp' AG_FILE
 checkRequiredFile './source/od-pairs' '*.shp' OD_FILE
-checkRequiredFile './source/traffic_matrix.csv' OD_TRAFFIC_FILE
+checkRequiredFile './source/od-pairs/' 'traffic_matrix.csv' OD_TRAFFIC_FILE
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
@@ -113,6 +113,7 @@ echo "Prepare bridge data..."
 ./node_modules/.bin/csv2geojson $BRIDGE_FILE --lat GPS_S --lon GPS_E > $TMP_DIR/bridges.geojson
 
 node ./scripts/prep-bridge $TMP_DIR/bridges.geojson $TMP_DIR/roadnetwork.geojson
+# Needed for the vector tiles.
 cp $TMP_DIR/bridges.geojson ./output
 
 ###############################################################################
@@ -206,13 +207,28 @@ echo "Preparing OD data..."
 
 ogr2ogr -f "GeoJSON" $TMP_DIR/od.geojson $OD_FILE
 node ./scripts/process-traffic ./source/od-pairs/traffic_matrix.csv
+# Od pairs and traffic.json are needed as a output file for the EAUL script.
+cp $TMP_DIR/od.geojson ./output/od.geojson
+cp $TMP_DIR/traffic.json ./output/traffic.json
 
 echo "All done preparing the OD data."
 
 
 ###############################################################################
 #
-# 7. Add additional properties to each of the road segments:
+# 6. Download Flood data.
+#
+
+echo "Download file with flood depths"
+aws s3 cp s3://$S3_BUCKET/fluvial-pluvial/current/roadnetwork_stats.json $TMP_DIR/flood-depths-current.json
+# Flood data is needed as a output file for the EAUL script.
+cp $TMP_DIR/flood-depths-current.json ./output/flood-depths-current.json
+
+echo "All done with flood data."
+
+###############################################################################
+#
+# 8. Add additional properties to each of the road segments:
 #   - bridges - an array with the bridges and culverts of the road
 #   - floods - an array with max water levels for the road
 #   - length - length of the road

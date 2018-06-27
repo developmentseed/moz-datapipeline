@@ -598,9 +598,11 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
 
   // Create the unroutable pairs index.
   if (identifier === 'all') {
+    // Unique id to avoid overriding the unroutable file when uploading to S3.
+    const unroutableId = Math.round(Math.random() * 1E5).toString();
     odPairStatusTracker
       .finalize()
-      .unroutableToFile(odPairs, `${RESULTS_DIR}/unroutable-pairs.json`);
+      .unroutableToFile(odPairs, `${RESULTS_DIR}/unroutable-pairs-${unroutableId}.json`);
   }
   // Filter unroutable pairs from the odPairsFloodsRUC list.
   const odPairsFloodRUCFiltered = odPairsFloodsRUC.map(floodRUCData => {

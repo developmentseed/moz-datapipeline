@@ -33,6 +33,7 @@ const LOG_DIR = path.resolve(__dirname, '../../log/additional-props');
 const RN_FILE = path.resolve(SRC_DIR, 'roadnetwork.geojson');
 const BRIDGE_FILE = path.resolve(SRC_DIR, 'bridges.geojson');
 const BOUND_FILES = path.resolve(SRC_DIR, 'prov_boundaries.geojson');
+const FLOOD_FILE = path.resolve(SRC_DIR, 'flood-depths-current.geojson');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -40,8 +41,6 @@ clog('Loading province boundaries');
 const provBoundaries = fs.readJsonSync(BOUND_FILES);
 clog('Loading bridge and culvert data');
 const bridgeData = fs.readJsonSync(BRIDGE_FILE);
-
-const FLOOD_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats.json';
 
 clog('Loading road network');
 // rnData will be modified by the functions.
@@ -95,10 +94,8 @@ function run (rnData, floods) {
       fs.ensureDir(LOG_DIR)
     ]);
 
-    const floods = await fetch(FLOOD_FILE).then(res => res.json());
-
     tStart(`Total run time`)();
-    const data = run(rnData, floods);
+    const data = run(rnData, FLOOD_FILE);
 
     fs.writeJsonSync(RN_FILE, data);
     tEnd(`Total run time`)();

@@ -31,7 +31,11 @@ When the script is ran inside the container it follows these steps:
 - Runs the node eaul script
 - Uploads the result of each way to S3 as an individual file (in case the eaul script stops midway we won’t lose what was already done)
 
-It expects the files `od.geojson` and `roadnetwork.osm` to be available in the provided `S3_BUCKET` in a folder named `eaul/`
+It expects the following files to be available in the provided `S3_BUCKET` in a folder named `eaul/`:
+- OD pairs - `od.geojson`
+- Road network in osm xml - `roadnetwork.osm`
+- Flood data - `flood-depths-current.json`
+- Traffic data - `traffic.json`
 
 The docker image expects some env vars to be set:
 - `S3_BUCKET` - Bucket from where to download and upload files
@@ -52,6 +56,8 @@ docker run -it --rm \
   -e WAY_IDS=21926,22672 \
   moz-eaul
 ```
+
+The results will be uploaded to the provided s3 bucket under `eaul/results/`. This folder will also include a file with the unroutable pairs found during the processing.
 
 ## Building the image
 To build the image we need to use the Dockerfile in `script-eaul/`, but it has to be built with the global context because it needs files that are in the root directory.

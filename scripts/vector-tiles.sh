@@ -8,7 +8,7 @@ CONTROL=true
 ENV_VARS="AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY"
 
 for v in $ENV_VARS; do
-  if [ -z ${!v} ]; then
+  if [ -z "${!v}" ]; then
       echo "Missing env variable: $v"
       CONTROL=false
   fi
@@ -17,8 +17,6 @@ done
 if [ "$CONTROL" = false ]; then
  exit 1
 fi
-
-exit 1
 
 # Generate vector tiles from the Road Network and upload the to S3.
 
@@ -39,14 +37,14 @@ if [ -z "$AWS_BUCKET" ]; then
 fi
 
 # Check if the road network geojson exists.
-if [ ! -f $OUTPUT_DIR/roadnetwork-indicators.geojson ]; then
-  echo 'File roadnetwork-indicators.geojson not found in output directory.'
+if [ ! -f $OUTPUT_DIR/roadnetwork.geojson ]; then
+  echo 'File roadnetwork.geojson not found in output directory.'
   exit 1
 fi
 
 # Delete destination if it exists
 rm -rf $OUTPUT_DIR/roadnetwork-tiles
 
-tippecanoe -e $OUTPUT_DIR/roadnetwork-tiles -B 8 -z 13 -L roads:$OUTPUT_DIR/roadnetwork-indicators.geojson -L bridges:$OUTPUT_DIR/bridges.geojson
+tippecanoe -e $OUTPUT_DIR/roadnetwork-tiles -B 8 -z 13 -L roads:$OUTPUT_DIR/roadnetwork.geojson -L bridges:$OUTPUT_DIR/bridges.geojson
 
 aws s3 sync $OUTPUT_DIR/roadnetwork-tiles/ s3://$AWS_BUCKET/ --delete --content-encoding gzip --acl public-read

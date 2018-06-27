@@ -20,4 +20,4 @@ mv .tmp/roadnetwork.osrm* .tmp/osrm
 
 # Run
 echo "Calculating criticality"
-node scripts/criticality/index.js .tmp/
+node --max_old_space_size=4096 scripts/criticality/index.js .tmp/
