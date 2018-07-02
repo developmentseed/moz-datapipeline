@@ -1,9 +1,5 @@
 #! /bin/bash
 
-# Convert RN
-echo "Converting road network"
-python ./libs/ogr2osm/ogr2osm.py .tmp/roadnetwork.shp --split-ways 1 -t ./libs/ogr2osm/default_translation.py -o .tmp/roadnetwork.osm -f --positive-id
-
 # Create ways index
 echo "Creating way index"
 node scripts/utils/extract-ways.js .tmp/

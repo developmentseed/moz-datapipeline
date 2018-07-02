@@ -241,3 +241,13 @@ echo "Add additional properties to road network..."
 node ./scripts/additional-props/index.js
 
 echo "All done preparing the base data."
+
+###############################################################################
+#
+# 9. Converting the geojson to osm xml
+#
+
+echo "Converting RN to osm..."
+python ./libs/ogr2osm/ogr2osm.py .tmp/roadnetwork.geojson --split-ways 1 -t ./libs/ogr2osm/default_translation.py -o .tmp/roadnetwork.osm -f --positive-id
+# OSM Road Network is needed as a output file for the EAUL script.
+cp $TMP_DIR/roadnetwork.osm ./output/roadnetwork.osm
