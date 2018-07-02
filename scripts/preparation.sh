@@ -220,7 +220,7 @@ echo "All done preparing the OD data."
 #
 
 echo "Download file with flood depths"
-aws s3 cp s3://$S3_BUCKET/fluvial-pluvial/current/roadnetwork_stats.json $TMP_DIR/flood-depths-current.json
+curl https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats.json > $TMP_DIR/flood-depths-current.json
 # Flood data is needed as a output file for the EAUL script.
 cp $TMP_DIR/flood-depths-current.json ./output/flood-depths-current.json
 

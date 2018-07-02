@@ -1,6 +1,5 @@
 'use strict';
 import fs from 'fs-extra';
-import fetch from 'node-fetch';
 import path from 'path';
 import Promise from 'bluebird';
 import length from '@turf/length';
@@ -33,7 +32,7 @@ const LOG_DIR = path.resolve(__dirname, '../../log/additional-props');
 const RN_FILE = path.resolve(SRC_DIR, 'roadnetwork.geojson');
 const BRIDGE_FILE = path.resolve(SRC_DIR, 'bridges.geojson');
 const BOUND_FILES = path.resolve(SRC_DIR, 'prov_boundaries.geojson');
-const FLOOD_FILE = path.resolve(SRC_DIR, 'flood-depths-current.geojson');
+const FLOOD_FILE = path.resolve(SRC_DIR, 'flood-depths-current.json');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -41,6 +40,8 @@ clog('Loading province boundaries');
 const provBoundaries = fs.readJsonSync(BOUND_FILES);
 clog('Loading bridge and culvert data');
 const bridgeData = fs.readJsonSync(BRIDGE_FILE);
+clog('Loading flood data');
+const floodData = fs.readJsonSync(FLOOD_FILE);
 
 clog('Loading road network');
 // rnData will be modified by the functions.
@@ -95,7 +96,7 @@ function run (rnData, floods) {
     ]);
 
     tStart(`Total run time`)();
-    const data = run(rnData, FLOOD_FILE);
+    const data = run(rnData, floodData);
 
     fs.writeJsonSync(RN_FILE, data);
     tEnd(`Total run time`)();

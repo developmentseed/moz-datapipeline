@@ -2,7 +2,7 @@
 
 apt-get update
 apt-get -y upgrade
-apt-get install -y gdal-bin libsqlite3-dev zlib1g-dev python-pip gdal-bin python-gdal apt-transport-https ca-certificates software-properties-common
+apt-get install -y gdal-bin libsqlite3-dev zlib1g-dev python-pip gdal-bin python-gdal apt-transport-https ca-certificates software-properties-common curl
 
 # Utils - Remove afterwards
 apt-get install -y curl git build-essential make
