@@ -199,9 +199,10 @@ export function createSpeedProfile (speedProfileFile, ways, speed = 0, append = 
 
           const node = way.nodes[i];
           const nextNode = way.nodes[i + 1];
+          const rate = speed * 1000;
 
-          contents += `${node},${nextNode},${speed}\n`;
-          contents += `${nextNode},${node},${speed}`;
+          contents += `${node},${nextNode},${speed},${rate}\n`;
+          contents += `${nextNode},${node},${speed},${rate}`;
         }
 
         if (!file.write(contents)) {

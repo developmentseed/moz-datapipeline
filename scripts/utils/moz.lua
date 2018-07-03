@@ -70,7 +70,16 @@ function process_way (profile, way, result)
 
   -- The weight can be thought of as the resistance or cost when
   -- passing the way. Routing will prefer ways with low weight.
-  result.weight = ruc
+  -- The weight can't be used, because the routing engine will choose the
+  -- way with the lowest ruc as it goes instead of looking at the
+  -- overall picture.
+  -- result.weight = ruc
+
+  -- By setting rate = speed on all ways, the result will be fastest
+  -- path routing. We multiply be 1000 to ensure the value is big enough that
+  -- there are no doubts.
+  result.forward_rate = 1 / ruc * 1000
+  result.backward_rate = 1 / ruc * 1000
 
 end
 
