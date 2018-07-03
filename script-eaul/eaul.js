@@ -594,6 +594,7 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
     const floodOSRM = floodOSRMFiles[retPeriod];
     var osrm = new OSRM({ path: `${floodOSRM}/roadnetwork.osrm`, algorithm: 'CH' });
     const result = await osrmTable(osrm, {coordinates: coords});
+    jsonToFile(`${LOG_DIR}/flood-${retPeriod}--${identifier}.json`)(result);
 
     // Global run. Track the OD Pairs that are unroutable.
     if (identifier === 'all') {
@@ -706,8 +707,11 @@ async function run (odPairs) {
       tEnd(`[UPGRADE WAYS] ${way.id} calcEaul`)();
       clog(`[UPGRADE WAYS] ${way.id} EAUL`, wayUpgradeEAUL);
 
-      const finalEAUL = baselineEAUL - wayUpgradeEAUL;
+      let finalEAUL = baselineEAUL - wayUpgradeEAUL;
       clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade.id}] the eaul is`, finalEAUL);
+
+      // Neglectable value.
+      if (Math.abs(finalEAUL) < 1) { finalEAUL = 0; }
 
       wayResult.eaul[upgrade.id] = finalEAUL;
 
