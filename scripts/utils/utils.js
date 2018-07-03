@@ -179,6 +179,14 @@ export function createSpeedProfile (speedProfileFile, ways, speed = 0, append = 
     const opts = append ? {flags: 'a'} : {};
     const file = fs.createWriteStream(speedProfileFile, opts);
 
+    // Check if the file is empty.
+    // If it is we don't need to add a new line at the beginning.
+    const onOpen = async () => {
+      const stats = await fs.fstat(file.fd);
+      append = !!stats.size;
+      processWays();
+    };
+
     // The stream cannot process data as fast as the for loop prepares it
     // so as soon as the buffer fills up the stream starts tp write into
     // userspace memory. We need to check when file.write() returns false,
@@ -214,7 +222,7 @@ export function createSpeedProfile (speedProfileFile, ways, speed = 0, append = 
     };
 
     file
-      .on('open', () => processWays())
+      .on('open', () => onOpen())
       .on('error', err => reject(err))
       .on('finish', () => resolve());
   });
@@ -276,7 +284,6 @@ export async function osrmContract (osrmFolder, speedProfileFile, processId, opt
   await runCmd('docker', [
     'run',
     '--rm',
-    '-t',
     '-v', `${dockerVolMount}:${dockerVolMount}`,
     // 'osrm/osrm-backend:v5.16.4',
     'developmentseed/osrm-backend:5.18-b',
