@@ -179,6 +179,7 @@ const ROAD_UPGRADES = [
     condition: 'good'
   }
 ];
+
 class ODPairStatusTracker {
   constructor (odPairs) {
     // Stores the unroutable pairs and the routable indexes for each group
@@ -367,13 +368,15 @@ function getUpgradeWaySpeed (way, upgrade) {
  * Calculates the repair time given a flood return period.
  *
  * @param {number} retPeriod Flood return period.
+ * @param {object} upgradeWay Way that is going to be upgraded.
+ * @param {object} upgrade Object with impact of road upgrade.
  *
  * @uses floodDepth   Object with flood depths per road per return period
  *                    {"N1-T8083": {"10": 2.06, "20": 2.29}, "R441-T5116": {"10": 0.26, "20": 0.41}}
  *
  * @returns {number} The repair time.
  */
-function calcFloodRepairTime (retPeriod) {
+function calcFloodRepairTime (retPeriod, upgradeWay, upgrade) {
   // Calculate flood repair time `r`.
   // Get the impassable ways for this flood return period.
   // Calculate the repair time for each one and get the max.
@@ -387,7 +390,7 @@ function calcFloodRepairTime (retPeriod) {
     if (wlcc > 0.5 && wlcc <= 1.5) severity = 'medium';
     if (wlcc > 1.5) severity = 'high';
 
-    const roadSurface = getSurface(way.tags);
+    const roadSurface = upgradeWay && way.id === upgradeWay.id ? upgrade.surface : getSurface(way.tags);
     const roadClass = getRoadClass(way.tags);
     const wayLen = parseFloat(way.tags.length) / 1000;
 
@@ -542,12 +545,14 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgrade) {
  * @param {array} odPairs List of OD Pairs
  * @param {array} baselineRUC RUC for all odPairs without disruption.
  * @param {array} odPairsFloodRUC RUC for all odPairs with flooded network.
+ * @param {object} upgradeWay Way that is going to be upgraded.
+ * @param {object} upgrade Object with impact of road upgrade.
  *
  * @returns {number} Increased user cost
  */
-function calcIncreasedUserCost (retPeriod, odPairs, baselineRUC, odPairsFloodRUC) {
+function calcIncreasedUserCost (retPeriod, odPairs, baselineRUC, odPairsFloodRUC, upgradeWay, upgrade) {
   // Flood repair time.
-  const r = calcFloodRepairTime(retPeriod);
+  const r = calcFloodRepairTime(retPeriod, upgradeWay, upgrade);
   const sum = odPairsFloodRUC.reduce((acc, odPairRUC, idx) => {
     const origin = odPairs[odPairRUC.oIdx];
     const destination = odPairs[odPairRUC.dIdx];
@@ -566,12 +571,14 @@ function calcIncreasedUserCost (retPeriod, odPairs, baselineRUC, odPairsFloodRUC
  * @param {array} odPairs OD Pairs to use.
  * @param {object} floodOSRMFiles Flood OSRM files path.
  * @param {string} identifier Unique id for the execution.
+ * @param {object} upgradeWay Way that is going to be upgraded.
+ * @param {object} upgrade Object with impact of road upgrade.
  *
  * @uses getFloodOSRMFile()
  * @uses osrmTable()
  * @uses {object} unroutableFloodedPairs
  */
-async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all') {
+async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all', upgradeWay, upgrade) {
   // Extract all the coordinates for osrm.
   const coords = odPairs.map(feat => feat.geometry.coordinates);
 
@@ -625,9 +632,9 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
   let floodSum = 0;
   for (let i = 0; i <= t.length - 2; i++) {
     // Increased User Cost of `i`.
-    const ui = calcIncreasedUserCost(t[i], odPairs, baselineRUCFiltered, odPairsFloodRUCFiltered[i]);
+    const ui = calcIncreasedUserCost(t[i], odPairs, baselineRUCFiltered, odPairsFloodRUCFiltered[i], upgradeWay, upgrade);
     // Increased User Cost of `i + 1`.
-    const ui1 = calcIncreasedUserCost(t[i + 1], odPairs, baselineRUCFiltered, odPairsFloodRUCFiltered[i + 1]);
+    const ui1 = calcIncreasedUserCost(t[i + 1], odPairs, baselineRUCFiltered, odPairsFloodRUCFiltered[i + 1], upgradeWay, upgrade);
     floodSum += (1 / t[i] - 1 / t[i + 1]) * (ui + ui1);
   }
 
@@ -695,7 +702,7 @@ async function run (odPairs) {
       // Calculate the EAUL of all OD pairs for this way-upgrade combination.
       clog(`[UPGRADE WAYS] ${way.id} Calculate EAUL`);
       tStart(`[UPGRADE WAYS] ${way.id} calcEaul`)();
-      const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade.id}`);
+      const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade.id}`, way, upgrade);
       tEnd(`[UPGRADE WAYS] ${way.id} calcEaul`)();
       clog(`[UPGRADE WAYS] ${way.id} EAUL`, wayUpgradeEAUL);
 
