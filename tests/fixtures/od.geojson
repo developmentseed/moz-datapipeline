@@ -1,0 +1,47 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "INDEX_ID": 1,
+        "name": "A"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "INDEX_ID": 2,
+        "name": "B"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0.026949474,
+          0
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "INDEX_ID": 3,
+        "name": "C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0.017966316,
+          0.004491579
+        ]
+      }
+    }
+  ]
+}
