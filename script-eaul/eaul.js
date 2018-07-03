@@ -556,7 +556,7 @@ function calcIncreasedUserCost (retPeriod, odPairs, baselineRUC, odPairsFloodRUC
   const sum = odPairsFloodRUC.reduce((acc, odPairRUC, idx) => {
     const origin = odPairs[odPairRUC.oIdx];
     const destination = odPairs[odPairRUC.dIdx];
-    return (odPairRUC.ruc - baselineRUC[idx].ruc) * getODPairTraffic(origin, destination);
+    return acc + (odPairRUC.ruc - baselineRUC[idx].ruc) * getODPairTraffic(origin, destination);
   }, 0);
 
   return r * sum;
