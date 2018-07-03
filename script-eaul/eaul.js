@@ -389,7 +389,7 @@ function calcFloodRepairTime (retPeriod) {
 
     const roadSurface = getSurface(way.tags);
     const roadClass = getRoadClass(way.tags);
-    const wayLen = parseFloat(way.tags.Length) / 1000;
+    const wayLen = parseFloat(way.tags.length) / 1000;
 
     const rTime = wayLen * FLOOD_REPAIRTIME[severity][roadSurface][roadClass];
     return Math.max(rTime, max);
