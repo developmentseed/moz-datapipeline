@@ -29,11 +29,11 @@ The dataset contains 3 points of interest.
   - Unroutable in return period: 9 and 10
 - **Route 2**  
   - Road segments: `1-4-5-6`
-  - Total RUC = $ 4.00
+  - Total RUC = $ 4.25
   - Unroutable in return period: 10
 - **Route 3**  
   - Road segments: `1-7-8-9`
-  - Total RUC = $ 4.20
+  - Total RUC = $ 4.45
   - Always routable
 
 `A - B` is routable in all return periods.
