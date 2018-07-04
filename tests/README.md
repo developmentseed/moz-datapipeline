@@ -50,3 +50,27 @@ Road segments are generally not flooded, except in the following cases:
 
 ## Traffic
 Traffic is stable at 100 / day, for all directions on all OD pairs.
+
+## Run the test
+From the root directory
+
+Preparation
+```
+mkdir -p testrun/osrm
+cp tests/fixtures/od.geojson testrun
+cp tests/fixtures/roadnetwork.osm testrun
+cp tests/fixtures/traffic.json testrun
+cp scripts/utils/moz.lua testrun
+
+node scripts/utils/extract-ways.js testrun
+
+docker run -t -v $(pwd)/testrun:/data developmentseed/osrm-backend:5.18-b osrm-extract -p /data/moz.lua /data/roadnetwork.osm
+docker run -t -v $(pwd)/testrun:/data developmentseed/osrm-backend:5.18-b osrm-contract /data/roadnetwork.osrm
+mv testrun/roadnetwork.osrm* testrun/osrm
+```
+
+Run
+```
+rm -rf testrun/eaul-workdir testrun/results
+node script-eaul/ testrun/ -o testrun/results
+```
