@@ -35,7 +35,7 @@ echo "Download RN file"
 aws s3 cp s3://$S3_BUCKET/eaul/roadnetwork.osm roadnetwork.osm
 
 echo "Download file traffic information"
-aws s3 cp s3://$S3_BUCKET/fluvial-pluvial/current/traffic.json traffic.json
+aws s3 cp s3://$S3_BUCKET/eaul/traffic.json traffic.json
 
 # Create ways index
 echo "Creating way index"
@@ -53,7 +53,7 @@ mv roadnetwork.osrm* ./osrm
 
 # Running eaul
 echo "Calc eaul"
-node /var/pipeline/script-eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results --ways $WAY_IDS
+node --max_old_space_size=4096 /var/pipeline/script-eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results --ways $WAY_IDS
 
 # Upload results
 echo "Upload results"
