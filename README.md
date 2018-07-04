@@ -26,7 +26,6 @@ Calculating the EAUL is very computationally expensive, so this was built as a d
 For this same reason it requires some files to be uploaded to a S3 bucket.
 - OD pairs - `od.geojson`
 - Road network in osm xml - `roadnetwork.osm`
-- Flood data - `flood-depths-current.json`
 - Traffic data - `traffic.json`
 
 All these files are generated in the previous step and are found inside the `output/` directory.

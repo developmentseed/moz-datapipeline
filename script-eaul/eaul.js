@@ -53,18 +53,15 @@ const RESULTS_DIR = program.O || path.resolve(TMP_DIR, 'results');
 const OD_FILE = path.resolve(SOURCE_DIR, 'od.geojson');
 const OSRM_FOLDER = path.resolve(SOURCE_DIR, 'osrm');
 const WAYS_FILE = path.resolve(SOURCE_DIR, 'roadnetwork-osm-ways.json');
-const FLOOD_DEPTH_FILE = path.resolve(SOURCE_DIR, 'flood-depths-current.json');
 const TRAFFIC_FILE = path.resolve(SOURCE_DIR, 'traffic.json');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Using OD Pairs', OD_FILE);
 clog('Using RN Ways', WAYS_FILE);
-clog('Using Flood depth', FLOOD_DEPTH_FILE);
 clog('Using Traffic', TRAFFIC_FILE);
 const odPairs = fs.readJsonSync(OD_FILE);
 var allWaysList = fs.readJsonSync(WAYS_FILE);
-const floodDepth = fs.readJsonSync(FLOOD_DEPTH_FILE);
 const trafficData = fs.readJsonSync(TRAFFIC_FILE);
 
 // Filter ways according to input.
@@ -179,6 +176,21 @@ const ROAD_UPGRADES = [
     condition: 'good'
   }
 ];
+
+// Construct flood depth matrix from the info on the RN.
+// Value on the rn will be something like (10:0,0,0,0,0,0,0,0,0,0)
+// Convert to {"name": {"10": 2.06, "20": 2.29}
+const floodDepth = waysList.reduce((acc, way) => {
+  const {NAME, floods} = way.tags;
+
+  const floodLevel = floods.match(/\(10:(.+)\)/)[1].split(',');
+  acc[NAME] = FLOOD_RETURN_PERIOD.reduce((_acc, ret, idx) => {
+    _acc[ret] = parseFloat(floodLevel[idx]);
+    return _acc;
+  }, {});
+
+  return acc;
+}, {});
 
 class ODPairStatusTracker {
   constructor (odPairs) {

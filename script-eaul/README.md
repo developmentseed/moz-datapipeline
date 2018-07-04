@@ -4,6 +4,37 @@ The EAUL script is different from the others since it isn't part of the pipeline
 
 Information about the script that adds the results back into the road network can be found on the [merge-eaul README.md](../scripts/merge-eaul)
 
+## Needed files
+The script has some requirements regarding the structure of the files it uses.
+
+**OSRM** - `osrm/roadnetwork.osrm*`  
+OSRM files as produced by the `osrm-extract` and `osrm-constract` commands.
+
+**OD Pairs** - `od.geojson`  
+Must be a FeatureCollection of points with the following mandatory properties:
+- OBJECTID
+
+**Road Network** - `roadnetwork.osm`  
+Must be in OSM XML format with positive ids and the following tags:
+- length
+- NAME
+- AVG_COND
+- RUC
+- SURF_TYPE
+- floods
+- ROAD_CLASS
+
+**Traffic data** - `traffic.json`  
+Traffic data between OD pairs with the following structure:
+```
+{
+  "origin": 1, // Must match the OBJECTID
+  "destination": 2, // Must match the OBJECTID
+  "dailyODCount": 100,
+  "reverseODCount": 100
+}
+```
+
 ## Running locally
 The script can be ran locally without docker. In this case run the node script directly bypassing the `eaul.sh`
 Useful during development.
@@ -25,7 +56,7 @@ Usage: script-eaul [options] <source-dir>
 
 ## Running with docker
 When the script is ran inside the container it follows these steps:
-- Downloads the RN, the OD pairs, flood and traffic information
+- Downloads the RN, the OD pairs and traffic information
 - Creates a way index file from the RN
 - Creates the OSRM
 - Runs the node eaul script
@@ -34,7 +65,6 @@ When the script is ran inside the container it follows these steps:
 It expects the following files to be available in the provided `S3_BUCKET` in a folder named `eaul/`:
 - OD pairs - `od.geojson`
 - Road network in osm xml - `roadnetwork.osm`
-- Flood data - `flood-depths-current.json`
 - Traffic data - `traffic.json`
 
 The docker image expects some env vars to be set:
