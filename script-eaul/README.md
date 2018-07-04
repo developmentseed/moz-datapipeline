@@ -12,7 +12,7 @@ OSRM files as produced by the `osrm-extract` and `osrm-constract` commands.
 
 **OD Pairs** - `od.geojson`  
 Must be a FeatureCollection of points with the following mandatory properties:
-- OBJECTID
+- INDEX_OD
 
 **Road Network** - `roadnetwork.osm`  
 Must be in OSM XML format with positive ids and the following tags:
@@ -28,8 +28,8 @@ Must be in OSM XML format with positive ids and the following tags:
 Traffic data between OD pairs with the following structure:
 ```
 {
-  "origin": 1, // Must match the OBJECTID
-  "destination": 2, // Must match the OBJECTID
+  "origin": 1, // Must match the INDEX_OD
+  "destination": 2, // Must match the INDEX_OD
   "dailyODCount": 100,
   "reverseODCount": 100
 }

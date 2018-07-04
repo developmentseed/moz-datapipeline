@@ -4,7 +4,7 @@
     {
       "type": "Feature",
       "properties": {
-        "OBJECTID": 1,
+        "INDEX_OD": 1,
         "name": "A"
       },
       "geometry": {
@@ -18,7 +18,7 @@
     {
       "type": "Feature",
       "properties": {
-        "OBJECTID": 2,
+        "INDEX_OD": 2,
         "name": "B"
       },
       "geometry": {
@@ -32,7 +32,7 @@
     {
       "type": "Feature",
       "properties": {
-        "OBJECTID": 3,
+        "INDEX_OD": 3,
         "name": "C"
       },
       "geometry": {

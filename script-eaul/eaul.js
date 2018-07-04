@@ -219,8 +219,8 @@ class ODPairStatusTracker {
     this.noTrafficPairs = trafficData.reduce((acc, pair) => {
       const total = pair.dailyODCount + pair.reverseODCount;
       if (total === 0) {
-        const oIdx = odPairs.findIndex(el => el.properties.OBJECTID === pair.origin);
-        const dIdx = odPairs.findIndex(el => el.properties.OBJECTID === pair.destination);
+        const oIdx = odPairs.findIndex(el => el.properties.INDEX_OD === pair.origin);
+        const dIdx = odPairs.findIndex(el => el.properties.INDEX_OD === pair.destination);
         acc[`${oIdx}-${dIdx}`] = true;
       }
       return acc;
@@ -422,8 +422,8 @@ function calcFloodRepairTime (retPeriod, upgradeWay, upgrade) {
  * @returns {number} OD pair traffic.
  */
 function getODPairTraffic (origin, destination) {
-  const oId = origin.properties.OBJECTID;
-  const dId = destination.properties.OBJECTID;
+  const oId = origin.properties.INDEX_OD;
+  const dId = destination.properties.INDEX_OD;
   const traffic = trafficData.find(o => o.origin === oId && o.destination === dId);
   return traffic.dailyODCount + traffic.reverseODCount;
 }
