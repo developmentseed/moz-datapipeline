@@ -41,7 +41,10 @@ const provBoundaries = fs.readJsonSync(BOUND_FILES);
 clog('Loading bridge and culvert data');
 const bridgeData = fs.readJsonSync(BRIDGE_FILE);
 
-const FLOOD_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats.json';
+// Flood depth file contains max flood depths for road segment
+// Flood length file contains percent of road flooded
+const FLOOD_DEPTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-max.json';
+const FLOOD_LENGTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-percent.json';
 
 clog('Loading road network');
 // rnData will be modified by the functions.
@@ -68,25 +71,27 @@ function addBridgeInfo (way) {
     }));
 }
 
-function addFloodInfo (way, floods) {
-  const wayFloods = floods[way.properties.NAME];
+function addFloodInfo (way, floodDepths, floodLengths) {
+  const wayFloodDepths = floodDepths[way.properties.NAME];
+  const wayFloodLengths = floodLengths[way.properties.NAME];
 
   // The return periods of the flood data
   const returnPeriods = [ 5, 10, 20, 50, 75, 100, 200, 250, 500, 1000 ];
 
-  way.properties.floods = returnPeriods.map(r => round(wayFloods[r]));
+  way.properties['flood_depths'] = returnPeriods.map(r => round(wayFloodDepths[r]));
+  way.properties['flood_lengths'] = returnPeriods.map(r => round(wayFloodLengths[r]));
 }
 
 function scaleRUC (way) {
   way.properties.RUC = 5.7762 * way.properties.RUC - 0.0334;
 }
 
-function run (rnData, floods) {
+function run (rnData, floodDepths, floodLengths) {
   rnData.features.forEach(way => {
     addWayLength(way);
     addWayProvince(way);
     addBridgeInfo(way);
-    addFloodInfo(way, floods);
+    addFloodInfo(way, floodDepths, floodLengths);
     scaleRUC(way);
   });
 
@@ -100,10 +105,11 @@ function run (rnData, floods) {
       fs.ensureDir(LOG_DIR)
     ]);
 
-    const floods = await fetch(FLOOD_FILE).then(res => res.json());
+    const floodDepths = await fetch(FLOOD_DEPTH_FILE).then(res => res.json());
+    const floodLengths = await fetch(FLOOD_LENGTH_FILE).then(res => res.json());
 
     tStart(`Total run time`)();
-    const data = run(rnData, floods);
+    const data = run(rnData, floodDepths, floodLengths);
 
     fs.writeJsonSync(RN_FILE, data);
     tEnd(`Total run time`)();

@@ -35,4 +35,4 @@ bash scripts/criticality/criticality.sh
 # Attach indicators to RN
 node ./scripts/merge-indicators/index.js
 
-rm -r .tmp
+# rm -r .tmp
