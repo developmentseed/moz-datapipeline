@@ -230,9 +230,11 @@ echo "All done with flood data."
 #
 # 8. Add additional properties to each of the road segments:
 #   - bridges - an array with the bridges and culverts of the road
-#   - floods - an array with max water levels for the road
+#   - flood_depths - an array with max water levels for the road
+#   - flood_lengths - an array with percent of the road flooded
 #   - length - length of the road
 #   - provinceIso - ISO code of province the roads belongs to
+#   - ruc - scale the RUC
 #
 
 echo "Add additional properties to road network..."

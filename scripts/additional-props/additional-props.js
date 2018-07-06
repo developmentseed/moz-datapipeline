@@ -32,7 +32,11 @@ const LOG_DIR = path.resolve(__dirname, '../../log/additional-props');
 const RN_FILE = path.resolve(SRC_DIR, 'roadnetwork.geojson');
 const BRIDGE_FILE = path.resolve(SRC_DIR, 'bridges.geojson');
 const BOUND_FILES = path.resolve(SRC_DIR, 'prov_boundaries.geojson');
-const FLOOD_FILE = path.resolve(SRC_DIR, 'flood-depths-current.json');
+
+// Flood depth file contains max flood depths for road segment
+// Flood length file contains percent of road flooded
+const FLOOD_DEPTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-max.json';
+const FLOOD_LENGTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-percent.json';
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -40,8 +44,10 @@ clog('Loading province boundaries');
 const provBoundaries = fs.readJsonSync(BOUND_FILES);
 clog('Loading bridge and culvert data');
 const bridgeData = fs.readJsonSync(BRIDGE_FILE);
+
 clog('Loading flood data');
-const floodData = fs.readJsonSync(FLOOD_FILE);
+const floodDepths = fs.readJsonSync(FLOOD_DEPTH_FILE);
+const floodLengths = fs.readJsonSync(FLOOD_LENGTH_FILE);
 
 clog('Loading road network');
 // rnData will be modified by the functions.
@@ -68,21 +74,28 @@ function addBridgeInfo (way) {
     }));
 }
 
-function addFloodInfo (way, floods) {
-  const wayFloods = floods[way.properties.NAME];
+function addFloodInfo (way) {
+  const wayFloodDepths = floodDepths[way.properties.NAME];
+  const wayFloodLengths = floodLengths[way.properties.NAME];
 
   // The return periods of the flood data
   const returnPeriods = [ 5, 10, 20, 50, 75, 100, 200, 250, 500, 1000 ];
 
-  way.properties.floods = returnPeriods.map(r => round(wayFloods[r]));
+  way.properties['flood_depths'] = returnPeriods.map(r => round(wayFloodDepths[r]));
+  way.properties['flood_lengths'] = returnPeriods.map(r => round(wayFloodLengths[r]));
 }
 
-function run (rnData, floods) {
+function scaleRUC (way) {
+  way.properties.RUC = 5.7762 * way.properties.RUC - 0.0334;
+}
+
+function run (rnData, floodDepths, floodLengths) {
   rnData.features.forEach(way => {
     addWayLength(way);
     addWayProvince(way);
     addBridgeInfo(way);
-    addFloodInfo(way, floods);
+    addFloodInfo(way, floodDepths, floodLengths);
+    scaleRUC(way);
   });
 
   return rnData;
@@ -96,7 +109,7 @@ function run (rnData, floods) {
     ]);
 
     tStart(`Total run time`)();
-    const data = run(rnData, floodData);
+    const data = run(rnData);
 
     fs.writeJsonSync(RN_FILE, data);
     tEnd(`Total run time`)();

@@ -81,7 +81,9 @@ def get_stats(filenames, geom):
 
     origin_coords = geom['coordinates']
 
-    for f in filenames:
+    total_count = None
+
+    for i, f in enumerate(filenames):
         # convert polygon to image srs
         with rasterio.open(f) as src:
             dst = Proj(src.crs)
@@ -92,8 +94,14 @@ def get_stats(filenames, geom):
         with open(pfilename, 'w') as poly_f:
             poly_f.write(json.dumps(_geojson))
 
+        if i == 0:
+            total_count = float(zonal_stats(pfilename, f, stats="count", nodata=-1)[0]['count'])
+
         # calculate stats
-        stats.append(zonal_stats(pfilename, f, stats="count min max", nodata=999)[0])
+        st = zonal_stats(pfilename, f, stats="count mean min max", nodata=999)[0]
+        st['count'] = zonal_stats(pfilename, f, stats="count", nodata=-9999)[0]['count']
+        st['percent_flooded'] = st['count']/total_count * 100
+        stats.append(st)
     return stats
 
 
@@ -126,34 +134,43 @@ def copy_files(filenames, path='/tmp'):
 def main(inputdir, aoi, path, id_property='NAME'):
     filenames = copy_files(find_files(inputdir), path=path)
     #copy_files(find_files(inputdir, ext='csv'), path=path)
-    fout = os.path.join(path, os.path.splitext(os.path.basename(aoi))[0] + '_stats.json')
-    if not os.path.exists(fout):
+    fout1 = os.path.join(path, os.path.splitext(os.path.basename(aoi))[0] + '_stats-max.json')
+    fout2 = os.path.join(path, os.path.splitext(os.path.basename(aoi))[0] + '_stats-percent.json')
+    if True: #not os.path.exists(fout):
         # calculate stats
         with open(str(aoi), 'r') as f:
             gj = json.loads(f.read())
         numfeatures = len(gj['features'])
 
-        stats = {}
-        print('Saving output to %s' % fout)
+        stats_max = {}
+        stats_flooded = {}
+        print('Saving output to %s' % fout1)
         for i, feat in enumerate(gj['features']):
             if feat['geometry'] is not None:
                 fid = feat['properties'][id_property]
                 print('Calculating stats for fid %s (%s of %s)' % (fid, i+1, numfeatures))
-                _stats = []
+                _stats_max = []
+                _stats_flooded = []
                 for s in get_stats(filenames, feat['geometry']):
                     if s['max'] == -9999 or s['max'] is None:
-                        _stats.append(0)
+                        _stats_max.append(0)
+                        _stats_flooded.append(0)
                     else:
-                        _stats.append(s['max'])
+                        _stats_max.append(s['max'])
+                        _stats_flooded.append(s['percent_flooded'])
                 keys = [os.path.basename(f).split('_')[3][3:] for f in filenames]
-                stats[fid] = dict(zip(keys, _stats))
+                stats_max[fid] = dict(zip(keys, _stats_max))
+                stats_flooded[fid] = dict(zip(keys, _stats_flooded))
                 #if maxval == 999 or maxval == -9999:
                 #    import pdb; pdb.set_trace()
-        with open(fout, 'w') as f:
-            f.write(json.dumps(stats))
+        with open(fout1, 'w') as f:
+            f.write(json.dumps(stats_max))
+        with open(fout2, 'w') as f:
+            f.write(json.dumps(stats_flooded))
         # upload to s3
         if inputdir[0:5] == 's3://':
-            upload(fout, inputdir)
+            upload(fout1, inputdir)
+            upload(fout2, inputdir)
 
 
 def parse_args(args):

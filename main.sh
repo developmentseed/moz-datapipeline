@@ -44,4 +44,4 @@ node ./scripts/merge-indicators/index.js
 # Copy RN to output folder
 cp $TMP_DIR/roadnetwork.geojson ./output/roadnetwork.geojson
 
-# rm -r .tmp/*
+rm -r .tmp/*
