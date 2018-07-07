@@ -177,18 +177,26 @@ const ROAD_UPGRADES = [
   }
 ];
 
-// Construct flood depth matrix from the info on the RN.
+// Construct flood matrix from the info on the RN.
 // Value on the rn will be something like (10:0,0,0,0,0,0,0,0,0,0)
 // Convert to {"name": {"10": 2.06, "20": 2.29}
-const floodDepth = waysList.reduce((acc, way) => {
-  const {NAME, floods} = way.tags;
-
-  const floodLevel = floods.match(/\(10:(.+)\)/)[1].split(',');
-  acc[NAME] = FLOOD_RETURN_PERIOD.reduce((_acc, ret, idx) => {
+function parseFloodXML (floodData) {
+  const floodLevel = floodData.match(/\(10:(.+)\)/)[1].split(',');
+  return FLOOD_RETURN_PERIOD.reduce((_acc, ret, idx) => {
     _acc[ret] = parseFloat(floodLevel[idx]);
     return _acc;
   }, {});
+}
 
+const floodDepth = waysList.reduce((acc, way) => {
+  const {NAME, flood_depths} = way.tags;
+  acc[NAME] = parseFloodXML(flood_depths)
+  return acc;
+}, {});
+
+const floodLength = waysList.reduce((acc, way) => {
+  const {NAME, flood_lengths} = way.tags;
+  acc[NAME] = parseFloodXML(flood_lengths)
   return acc;
 }, {});
 
@@ -371,6 +379,8 @@ function getImpassableWays (retPeriod, upgradeWay, upgrade) {
  *
  * @uses floodDepth   Object with flood depths per road per return period
  *                    {"N1-T8083": {"10": 2.06, "20": 2.29}, "R441-T5116": {"10": 0.26, "20": 0.41}}
+ * @uses floodLength  Object with percent of road flooded per return period
+ *                    {"N1-T8083": {"10": 12.6, "20": 25.2}, "R441-T5116": {"10": 2, "20": 41}}
  *
  * @returns {number} The repair time.
  */
@@ -390,11 +400,13 @@ function calcFloodRepairTime (retPeriod, upgradeWay, upgrade) {
 
     const roadSurface = upgradeWay && way.id === upgradeWay.id ? upgrade.surface : getSurface(way.tags);
     const roadClass = getRoadClass(way.tags);
-    const wayLen = parseFloat(way.tags.length) / 1000;
+
+    // Calculate the length flooded
+    const lenFlooded = parseFloat(way.tags.length * (floodLength[way.tags.NAME][retPeriod]) / 100) / 1000;
 
     // Repair time is in hours / km. Calculate total number of days based on
     // length of flooded segment
-    const rTime = wayLen * FLOOD_REPAIRTIME[severity][roadSurface][roadClass] / 24;
+    const rTime = lenFlooded * FLOOD_REPAIRTIME[severity][roadSurface][roadClass] / 24;
 
     return Math.max(rTime, max);
   }, 0);
