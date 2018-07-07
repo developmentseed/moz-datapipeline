@@ -363,20 +363,6 @@ function getImpassableWays (retPeriod, upgradeWay, upgrade) {
 }
 
 /**
- * Returns the new speed for a way given an upgrade.
- * The speed is calculated with the formula: 1 / RUC
- *
- * @param {object} way  Way being upgraded.
- * @param {string} upgrade Upgrade to apply to the way.
- *                         Will be one of ROAD_UPGRADES
- *
- * @returns {number} New speed for way after the upgrade.
- */
-function getUpgradeWaySpeed (way, upgrade) {
-  return upgrade.speed;
-}
-
-/**
  * Calculate repair time in days of a road segment for a given return period.
  *
  * @param {number} retPeriod Flood return period.
@@ -533,8 +519,7 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgrade) {
     // If there is a way to upgrade, update the speed profile accordingly.
     if (upgradeWay) {
       // tStart(`[IGNORE WAYS] ${identifier} ${retPeriod} traffic profile upgrade`)();
-      const speed = getUpgradeWaySpeed(upgradeWay, upgrade);
-      await createSpeedProfile(speedProfileFile, [upgradeWay], speed, true);
+      await createSpeedProfile(speedProfileFile, [upgradeWay], upgrade.speed, true);
       // tEnd(`[IGNORE WAYS] ${identifier} ${retPeriod} traffic profile upgrade`)();
     }
 
@@ -699,13 +684,11 @@ async function run (odPairs) {
       tStart(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
 
       clog('[UPGRADE WAYS] id, upgrade:', way.id, upgrade.id);
-      // Get new speeds for this upgraded way.
-      const speed = getUpgradeWaySpeed(way, upgrade);
 
-      // Create a speed profile for the baseline.
+      // Create a speed profile for the upgrades.
       const speedProfileFile = `${workdir}/speed-upgrade-${way.id}.csv`;
       tStart(`[UPGRADE WAYS] ${way.id} traffic profile`)();
-      await createSpeedProfile(speedProfileFile, [way], speed);
+      await createSpeedProfile(speedProfileFile, [way], upgrade.speed);
       tEnd(`[UPGRADE WAYS] ${way.id} traffic profile`)();
 
       clog(`[UPGRADE WAYS] ${way.id} OSRM contract`);
