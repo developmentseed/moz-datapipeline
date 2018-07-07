@@ -84,7 +84,7 @@ const CONCURRENCY_FLOOD_EAUL = 5;
 
 const FLOOD_RETURN_PERIOD = [5, 10, 20, 50, 75, 100, 200, 250, 500, 1000];
 
-// Flood repair time depends on three factors:
+// Flood repair time in hours / km. Depends on three factors:
 //  - type of road (primary, secondary, tertiary, vicinal)
 //  - surface type (paved, unpaved)
 //  - severity of the flood (low, medium, high)
@@ -377,7 +377,7 @@ function getUpgradeWaySpeed (way, upgrade) {
 }
 
 /**
- * Calculates the repair time given a flood return period.
+ * Calculate repair time in days of a road segment for a given return period.
  *
  * @param {number} retPeriod Flood return period.
  * @param {object} upgradeWay Way that is going to be upgraded.
@@ -406,7 +406,10 @@ function calcFloodRepairTime (retPeriod, upgradeWay, upgrade) {
     const roadClass = getRoadClass(way.tags);
     const wayLen = parseFloat(way.tags.length) / 1000;
 
-    const rTime = wayLen * FLOOD_REPAIRTIME[severity][roadSurface][roadClass];
+    // Repair time is in hours / km. Calculate total number of days based on
+    // length of flooded segment
+    const rTime = wayLen * FLOOD_REPAIRTIME[severity][roadSurface][roadClass] / 24;
+
     return Math.max(rTime, max);
   }, 0);
 
