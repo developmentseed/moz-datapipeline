@@ -417,7 +417,7 @@ function calcFloodRepairTime (retPeriod, upgradeWay, upgrade) {
 }
 
 /**
- * Calculates the traffic between the origin and destination.
+ * Calculates the yearly traffic between the origin and destination.
  *
  * @param {object} origin Origin point.
  * @param {object} destination Destination point.
@@ -428,7 +428,7 @@ function getODPairTraffic (origin, destination) {
   const oId = origin.properties.INDEX_OD;
   const dId = destination.properties.INDEX_OD;
   const traffic = trafficData.find(o => o.origin === oId && o.destination === dId);
-  return traffic.dailyODCount + traffic.reverseODCount;
+  return traffic.dailyODCount + traffic.reverseODCount * 365;
 }
 
 /**
