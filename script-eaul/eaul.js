@@ -414,7 +414,7 @@ function getODPairTraffic (origin, destination) {
   const oId = origin.properties.INDEX_OD;
   const dId = destination.properties.INDEX_OD;
   const traffic = trafficData.find(o => o.origin === oId && o.destination === dId);
-  return traffic.dailyODCount + traffic.reverseODCount * 365;
+  return (traffic.dailyODCount + traffic.reverseODCount) * 365;
 }
 
 /**
