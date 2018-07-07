@@ -690,7 +690,9 @@ async function run (odPairs) {
     let wayResult = {
       id: way.id,
       name: way.tags.NAME,
-      eaul: {}
+      eaul: {
+        'baseline': baselineEAUL
+      }
     };
     tStart(`[UPGRADE WAYS] ${way.id} FULL`)();
     for (const upgrade of ROAD_UPGRADES) {
@@ -718,17 +720,16 @@ async function run (odPairs) {
       // Calculate the EAUL of all OD pairs for this way-upgrade combination.
       clog(`[UPGRADE WAYS] ${way.id} Calculate EAUL`);
       tStart(`[UPGRADE WAYS] ${way.id} calcEaul`)();
-      const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade.id}`, way, upgrade);
+      let wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade.id}`, way, upgrade);
       tEnd(`[UPGRADE WAYS] ${way.id} calcEaul`)();
       clog(`[UPGRADE WAYS] ${way.id} EAUL`, wayUpgradeEAUL);
 
-      let finalEAUL = baselineEAUL - wayUpgradeEAUL;
-      clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade.id}] the eaul is`, finalEAUL);
+      clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade.id}] the eaul is`, wayUpgradeEAUL);
 
       // Neglectable value.
-      if (Math.abs(finalEAUL) < 1) { finalEAUL = 0; }
+      if (Math.abs(wayUpgradeEAUL) < 1) { wayUpgradeEAUL = 0; }
 
-      wayResult.eaul[upgrade.id] = finalEAUL;
+      wayResult.eaul[upgrade.id] = wayUpgradeEAUL;
 
       tEnd(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
     }
