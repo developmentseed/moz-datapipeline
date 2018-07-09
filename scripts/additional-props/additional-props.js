@@ -1,6 +1,5 @@
 'use strict';
 import fs from 'fs-extra';
-import fetch from 'node-fetch';
 import path from 'path';
 import Promise from 'bluebird';
 import length from '@turf/length';
@@ -34,6 +33,11 @@ const RN_FILE = path.resolve(SRC_DIR, 'roadnetwork.geojson');
 const BRIDGE_FILE = path.resolve(SRC_DIR, 'bridges.geojson');
 const BOUND_FILES = path.resolve(SRC_DIR, 'prov_boundaries.geojson');
 
+// Flood depth file contains max flood depths for road segment
+// Flood length file contains percent of road flooded
+const FLOOD_DEPTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-max.json';
+const FLOOD_LENGTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-percent.json';
+
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Loading province boundaries');
@@ -41,10 +45,9 @@ const provBoundaries = fs.readJsonSync(BOUND_FILES);
 clog('Loading bridge and culvert data');
 const bridgeData = fs.readJsonSync(BRIDGE_FILE);
 
-// Flood depth file contains max flood depths for road segment
-// Flood length file contains percent of road flooded
-const FLOOD_DEPTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-max.json';
-const FLOOD_LENGTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-percent.json';
+clog('Loading flood data');
+const floodDepths = fs.readJsonSync(FLOOD_DEPTH_FILE);
+const floodLengths = fs.readJsonSync(FLOOD_LENGTH_FILE);
 
 clog('Loading road network');
 // rnData will be modified by the functions.
@@ -71,7 +74,7 @@ function addBridgeInfo (way) {
     }));
 }
 
-function addFloodInfo (way, floodDepths, floodLengths) {
+function addFloodInfo (way) {
   const wayFloodDepths = floodDepths[way.properties.NAME];
   const wayFloodLengths = floodLengths[way.properties.NAME];
 
@@ -105,11 +108,8 @@ function run (rnData, floodDepths, floodLengths) {
       fs.ensureDir(LOG_DIR)
     ]);
 
-    const floodDepths = await fetch(FLOOD_DEPTH_FILE).then(res => res.json());
-    const floodLengths = await fetch(FLOOD_LENGTH_FILE).then(res => res.json());
-
     tStart(`Total run time`)();
-    const data = run(rnData, floodDepths, floodLengths);
+    const data = run(rnData);
 
     fs.writeJsonSync(RN_FILE, data);
     tEnd(`Total run time`)();

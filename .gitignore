@@ -7,3 +7,5 @@ log/
 node_modules
 yarn-error.log
 *pyc
+.vscode
+testrun

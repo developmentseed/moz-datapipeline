@@ -70,7 +70,7 @@ async function run (data, targetFile, property, percentile) {
   // Filter the data and include everything outside the percentile rank
   let filteredFeatures = data.features.filter(f => f.properties[property] >= percentileValue);
 
-  return fs.writeFile(TARGET_FILE, JSON.stringify(featureCollection(filteredFeatures)));
+  return fs.writeFile(targetFile, JSON.stringify(featureCollection(filteredFeatures)));
 }
 
 (async function main () {
