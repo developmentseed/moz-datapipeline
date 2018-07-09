@@ -25,7 +25,6 @@ const { ROOT_DIR } = process.env;
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/criticality');
 
@@ -34,7 +33,7 @@ const WAYS_FILE = path.resolve(TMP_DIR, 'roadnetwork-osm-ways.json');
 const OSRM_FOLDER = path.resolve(TMP_DIR, 'osrm');
 
 const IND_NAME = 'criticality';
-const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
+const OUTPUT_INDICATOR_FILE = path.resolve(TMP_DIR, `indicator-${IND_NAME}.csv`);
 
 // Number of concurrent operations to run.
 const CONCURR_OPS = 5;
@@ -309,7 +308,6 @@ async function calcTimePenaltyForWay (way, coords, benchmark) {
 (async function main () {
   try {
     await Promise.all([
-      fs.ensureDir(OUTPUT_DIR),
       fs.ensureDir(TMP_DIR),
       fs.ensureDir(`${LOG_DIR}/ways-times`),
       fs.ensureDir(`${LOG_DIR}/osm-contract-logs`)

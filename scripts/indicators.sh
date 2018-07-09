@@ -1,9 +1,35 @@
 #! /bin/bash
 set -e
+# This script generates indicator data for the road network, generates Vector
+# Tiles and uploads them to S3.
 
 TMP_DIR=./.tmp
 
-bash ./scripts/preparation.sh
+# Expects some env variables to be set:
+# AWS_BUCKET
+# AWS_ACCESS_KEY_ID
+# AWS_SECRET_ACCESS_KEY
+
+# Load environment variables set in .env file
+export $(grep -v '^#' .env | xargs)
+
+CONTROL=true
+ENV_VARS="AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY"
+
+for v in $ENV_VARS; do
+  if [ -z "${!v}" ]; then
+      echo "Missing env variable: $v"
+      CONTROL=false
+  fi
+done
+
+if [ "$CONTROL" = false ]; then
+ exit 1
+fi
+
+echo "Download road network data from S3..."
+aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork.geojson $TMP_DIR/roadnetwork.geojson
+aws s3 cp s3://$AWS_BUCKET/base_data/bridges.geojson $TMP_DIR/
 
 # Add source data for fishery potential to GeoJSON with district boundaries
 csvcut -c ZS_ID,ArtFiMean ./source/p2Mozambique.csv > $TMP_DIR/fisheries.csv
@@ -35,13 +61,32 @@ node ./scripts/indicator-from-prop/index.js AADT
 # Calculate link criticality
 bash scripts/criticality/criticality.sh
 
+# Calculate the EAD on each segment
+node ./scripts/vulnerability
+
 # Backup RN before adding indicators
 cp $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork_no-indi.geojson
 
 # Attach indicators to RN
 node ./scripts/merge-indicators/index.js
 
-# Copy RN to output folder
-cp $TMP_DIR/roadnetwork.geojson ./output/roadnetwork.geojson
 
-rm -r .tmp/*
+###############################################################################
+#
+# Generate vector tiles from the road network and upload the to S3.
+#
+# Create a bucket
+# - Give public read access
+# - Enable CORS (Remove comment)
+#
+
+echo "Uploading road network with indicators to S3"
+aws s3 cp $TMP_DIR/roadnetwork.geojson s3://$AWS_BUCKET/base_data/roadnetwork_with-ind.geojson --content-encoding gzip --acl public-read
+
+echo "Uploading final vector tiles to S3"
+# Delete destination if it exists
+rm -rf $TMP_DIR/roadnetwork-tiles
+
+tippecanoe -e $TMP_DIR/roadnetwork-tiles -B 8 -z 13 -L roads:$TMP_DIR/roadnetwork.geojson -L bridges:$TMP_DIR/bridges.geojson
+
+aws s3 sync $TMP_DIR/roadnetwork-tiles/ s3://$AWS_BUCKET/tiles/ --delete --content-encoding gzip --acl public-read

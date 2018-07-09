@@ -1,14 +1,17 @@
 #! /bin/bash
 
 # Expects some env variables to be set:
-# S3_BUCKET
+# AWS_BUCKET
 # AWS_ACCESS_KEY_ID
 # AWS_SECRET_ACCESS_KEY
 # WAY_IDS
 # ROOT_DIR
 
+# Load environment variables set in .env file
+export $(grep -v '^#' .env | xargs)
+
 CONTROL=true
-ENV_VARS="S3_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY WAY_IDS ROOT_DIR"
+ENV_VARS="AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY WAY_IDS ROOT_DIR"
 
 for v in $ENV_VARS; do
   if [ -z "${!v}" ]; then
@@ -26,16 +29,15 @@ fi
 rm -rf /var/pipeline/.tmp/*
 cd /var/pipeline/.tmp
 
-
 # Download RN and OD pairs
 echo "Download OD pairs file"
-aws s3 cp s3://$S3_BUCKET/eaul/od.geojson od.geojson
+aws s3 cp s3://$AWS_BUCKET/base_data/od.geojson od.geojson
 
 echo "Download RN file"
-aws s3 cp s3://$S3_BUCKET/eaul/roadnetwork.osm roadnetwork.osm
+aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork.osm roadnetwork.osm
 
 echo "Download file traffic information"
-aws s3 cp s3://$S3_BUCKET/eaul/traffic.json traffic.json
+aws s3 cp s3://$AWS_BUCKET/base_data/traffic.json traffic.json
 
 # Create ways index
 echo "Creating way index"
@@ -53,8 +55,8 @@ mv roadnetwork.osrm* ./osrm
 
 # Running eaul
 echo "Calc eaul"
-node --max_old_space_size=4096 /var/pipeline/script-eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results --ways $WAY_IDS
+node --max_old_space_size=4096 /var/pipeline/scripts/eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results --ways $WAY_IDS
 
 # Upload results
 echo "Upload results"
-aws s3 sync /var/pipeline/.tmp/results/ s3://$S3_BUCKET/eaul/results/ --delete
+aws s3 sync /var/pipeline/.tmp/results/ s3://$AWS_BUCKET/eaul/results/ --delete
