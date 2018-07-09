@@ -22,7 +22,7 @@ Run with:
 ```
 ```
 
-When to run: **only** when road network is updated
+When to run: **only** when road network is updated.
 
 ### 3. Preparation
 This prepares the source data for use by the rest of the pipeline.
@@ -41,6 +41,8 @@ When to run: when any of the following source datasets changes:
 - boundaries (district and province)
 - agriculture potential
 
+If the road network changed, make sure to run step 1 & 2 before running this step.
+
 ### 4. Script EAUL
 Calculating the EAUL is computationally expensive, so this was built as a docker container that can run in several machines at once allowing distributed computation.
 For this same reason it requires some files to be uploaded to a S3 bucket.
@@ -50,27 +52,22 @@ For this same reason it requires some files to be uploaded to a S3 bucket.
 
 See the [EAUL script README.md](./scripts/eaul/README.md) for more information.
 
+When to run: **only** when one of the input datasets changes (road network, OD and traffic). Make sure to run step 3 first.
+
 ### 4. Adding EAUL results to the road network (instructions are WIP)
 Once the EAUL processing finished, the results can be added to the road network. This is a relatively fast operation that can be ran locally using the same docker container that contains the pipeline.
 See the [README.md](./scripts/merge-eaul/README.md) for instructions.
 
-### 5. Indicators pipeline
-This script computes the prioritization indicators.
+### 5. Indicator pipeline
+This script computes the prioritization indicators and generates the final Vector Tiles used by the application.
+The vector tiles script uses the Road Network and the Bridges on the S3 folder and uploads the resulting vector tiles to the S3 bucket.
 
 Run with:
 ```
 docker-compose run --rm moz-datapipeline bash ./scripts/indicators.sh
 ```
 
-When to run: when any of the source data changes.
-
-### 6. Generating the vector tiles
-After having all the data processed, generate the vector tiles to be used by the application.
-The vector tiles script uses the Road Network and the Bridges on the S3 folder and uploads the resulting vector tiles to the S3 bucket.
-
-```
-docker-compose run --rm moz-datapipeline bash ./scripts/vector-tiles.sh
-```
+When to run: when any of the source data changes. In that case, make sure to run the previous steps first.
 
 -----
 
