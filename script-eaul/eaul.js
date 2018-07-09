@@ -84,7 +84,7 @@ const CONCURRENCY_FLOOD_EAUL = 5;
 
 const FLOOD_RETURN_PERIOD = [5, 10, 20, 50, 75, 100, 200, 250, 500, 1000];
 
-// Flood repair time depends on three factors:
+// Flood repair time in hours / km. Depends on three factors:
 //  - type of road (primary, secondary, tertiary, vicinal)
 //  - surface type (paved, unpaved)
 //  - severity of the flood (low, medium, high)
@@ -177,18 +177,26 @@ const ROAD_UPGRADES = [
   }
 ];
 
-// Construct flood depth matrix from the info on the RN.
+// Construct flood matrix from the info on the RN.
 // Value on the rn will be something like (10:0,0,0,0,0,0,0,0,0,0)
 // Convert to {"name": {"10": 2.06, "20": 2.29}
-const floodDepth = waysList.reduce((acc, way) => {
-  const {NAME, floods} = way.tags;
-
-  const floodLevel = floods.match(/\(10:(.+)\)/)[1].split(',');
-  acc[NAME] = FLOOD_RETURN_PERIOD.reduce((_acc, ret, idx) => {
+function parseFloodXML (floodData) {
+  const floodLevel = floodData.match(/\(10:(.+)\)/)[1].split(',');
+  return FLOOD_RETURN_PERIOD.reduce((_acc, ret, idx) => {
     _acc[ret] = parseFloat(floodLevel[idx]);
     return _acc;
   }, {});
+}
 
+const floodDepth = waysList.reduce((acc, way) => {
+  const {NAME, flood_depths} = way.tags;
+  acc[NAME] = parseFloodXML(flood_depths)
+  return acc;
+}, {});
+
+const floodLength = waysList.reduce((acc, way) => {
+  const {NAME, flood_lengths} = way.tags;
+  acc[NAME] = parseFloodXML(flood_lengths)
   return acc;
 }, {});
 
@@ -363,21 +371,7 @@ function getImpassableWays (retPeriod, upgradeWay, upgrade) {
 }
 
 /**
- * Returns the new speed for a way given an upgrade.
- * The speed is calculated with the formula: 1 / RUC
- *
- * @param {object} way  Way being upgraded.
- * @param {string} upgrade Upgrade to apply to the way.
- *                         Will be one of ROAD_UPGRADES
- *
- * @returns {number} New speed for way after the upgrade.
- */
-function getUpgradeWaySpeed (way, upgrade) {
-  return upgrade.speed;
-}
-
-/**
- * Calculates the repair time given a flood return period.
+ * Calculate repair time in days of a road segment for a given return period.
  *
  * @param {number} retPeriod Flood return period.
  * @param {object} upgradeWay Way that is going to be upgraded.
@@ -385,6 +379,8 @@ function getUpgradeWaySpeed (way, upgrade) {
  *
  * @uses floodDepth   Object with flood depths per road per return period
  *                    {"N1-T8083": {"10": 2.06, "20": 2.29}, "R441-T5116": {"10": 0.26, "20": 0.41}}
+ * @uses floodLength  Object with percent of road flooded per return period
+ *                    {"N1-T8083": {"10": 12.6, "20": 25.2}, "R441-T5116": {"10": 2, "20": 41}}
  *
  * @returns {number} The repair time.
  */
@@ -404,9 +400,14 @@ function calcFloodRepairTime (retPeriod, upgradeWay, upgrade) {
 
     const roadSurface = upgradeWay && way.id === upgradeWay.id ? upgrade.surface : getSurface(way.tags);
     const roadClass = getRoadClass(way.tags);
-    const wayLen = parseFloat(way.tags.length) / 1000;
 
-    const rTime = wayLen * FLOOD_REPAIRTIME[severity][roadSurface][roadClass];
+    // Calculate the length flooded
+    const lenFlooded = parseFloat(way.tags.length * (floodLength[way.tags.NAME][retPeriod]) / 100) / 1000;
+
+    // Repair time is in hours / km. Calculate total number of days based on
+    // length of flooded segment
+    const rTime = lenFlooded * FLOOD_REPAIRTIME[severity][roadSurface][roadClass] / 24;
+
     return Math.max(rTime, max);
   }, 0);
 
@@ -414,7 +415,7 @@ function calcFloodRepairTime (retPeriod, upgradeWay, upgrade) {
 }
 
 /**
- * Calculates the traffic between the origin and destination.
+ * Calculates the yearly traffic between the origin and destination.
  *
  * @param {object} origin Origin point.
  * @param {object} destination Destination point.
@@ -425,7 +426,7 @@ function getODPairTraffic (origin, destination) {
   const oId = origin.properties.INDEX_OD;
   const dId = destination.properties.INDEX_OD;
   const traffic = trafficData.find(o => o.origin === oId && o.destination === dId);
-  return traffic.dailyODCount + traffic.reverseODCount;
+  return (traffic.dailyODCount + traffic.reverseODCount) * 365;
 }
 
 /**
@@ -530,8 +531,7 @@ async function prepareFloodOSRMFiles (wdir = TMP_DIR, upgradeWay, upgrade) {
     // If there is a way to upgrade, update the speed profile accordingly.
     if (upgradeWay) {
       // tStart(`[IGNORE WAYS] ${identifier} ${retPeriod} traffic profile upgrade`)();
-      const speed = getUpgradeWaySpeed(upgradeWay, upgrade);
-      await createSpeedProfile(speedProfileFile, [upgradeWay], speed, true);
+      await createSpeedProfile(speedProfileFile, [upgradeWay], upgrade.speed, true);
       // tEnd(`[IGNORE WAYS] ${identifier} ${retPeriod} traffic profile upgrade`)();
     }
 
@@ -687,20 +687,20 @@ async function run (odPairs) {
     let wayResult = {
       id: way.id,
       name: way.tags.NAME,
-      eaul: {}
+      eaul: {
+        'baseline': baselineEAUL
+      }
     };
     tStart(`[UPGRADE WAYS] ${way.id} FULL`)();
     for (const upgrade of ROAD_UPGRADES) {
       tStart(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
 
       clog('[UPGRADE WAYS] id, upgrade:', way.id, upgrade.id);
-      // Get new speeds for this upgraded way.
-      const speed = getUpgradeWaySpeed(way, upgrade);
 
-      // Create a speed profile for the baseline.
+      // Create a speed profile for the upgrades.
       const speedProfileFile = `${workdir}/speed-upgrade-${way.id}.csv`;
       tStart(`[UPGRADE WAYS] ${way.id} traffic profile`)();
-      await createSpeedProfile(speedProfileFile, [way], speed);
+      await createSpeedProfile(speedProfileFile, [way], upgrade.speed);
       tEnd(`[UPGRADE WAYS] ${way.id} traffic profile`)();
 
       clog(`[UPGRADE WAYS] ${way.id} OSRM contract`);
@@ -715,17 +715,16 @@ async function run (odPairs) {
       // Calculate the EAUL of all OD pairs for this way-upgrade combination.
       clog(`[UPGRADE WAYS] ${way.id} Calculate EAUL`);
       tStart(`[UPGRADE WAYS] ${way.id} calcEaul`)();
-      const wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade.id}`, way, upgrade);
+      let wayUpgradeEAUL = await calcEaul(osrmUpFolder, odPairs, floodOSRMFiles, `up-${way.id}-${upgrade.id}`, way, upgrade);
       tEnd(`[UPGRADE WAYS] ${way.id} calcEaul`)();
       clog(`[UPGRADE WAYS] ${way.id} EAUL`, wayUpgradeEAUL);
 
-      let finalEAUL = baselineEAUL - wayUpgradeEAUL;
-      clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade.id}] the eaul is`, finalEAUL);
+      clog(`For way [${way.id}] (${way.tags.NAME}) with the upgrade [${upgrade.id}] the eaul is`, wayUpgradeEAUL);
 
       // Neglectable value.
-      if (Math.abs(finalEAUL) < 1) { finalEAUL = 0; }
+      if (Math.abs(wayUpgradeEAUL) < 1) { wayUpgradeEAUL = 0; }
 
-      wayResult.eaul[upgrade.id] = finalEAUL;
+      wayResult.eaul[upgrade.id] = wayUpgradeEAUL;
 
       tEnd(`[UPGRADE WAYS] ${way.id} UPGRADE`)();
     }

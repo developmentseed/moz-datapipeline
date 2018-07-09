@@ -216,19 +216,7 @@ echo "All done preparing the OD data."
 
 ###############################################################################
 #
-# 6. Download Flood data.
-#
-
-echo "Download file with flood depths"
-curl https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats.json > $TMP_DIR/flood-depths-current.json
-# Flood data is needed as a output file for the EAUL script.
-cp $TMP_DIR/flood-depths-current.json ./output/flood-depths-current.json
-
-echo "All done with flood data."
-
-###############################################################################
-#
-# 8. Add additional properties to each of the road segments:
+# 7. Add additional properties to each of the road segments:
 #   - bridges - an array with the bridges and culverts of the road
 #   - flood_depths - an array with max water levels for the road
 #   - flood_lengths - an array with percent of the road flooded
@@ -246,7 +234,7 @@ echo "All done preparing the base data."
 
 ###############################################################################
 #
-# 9. Converting the geojson to osm xml
+# 8. Converting the geojson to osm xml
 #
 
 echo "Converting RN to osm..."
