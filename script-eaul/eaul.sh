@@ -29,13 +29,13 @@ cd /var/pipeline/.tmp
 
 # Download RN and OD pairs
 echo "Download OD pairs file"
-aws s3 cp s3://$S3_BUCKET/eaul/od.geojson od.geojson
+aws s3 cp s3://$S3_BUCKET/base_data/od.geojson od.geojson
 
 echo "Download RN file"
-aws s3 cp s3://$S3_BUCKET/eaul/roadnetwork.osm roadnetwork.osm
+aws s3 cp s3://$S3_BUCKET/base_data/roadnetwork.osm roadnetwork.osm
 
 echo "Download file traffic information"
-aws s3 cp s3://$S3_BUCKET/eaul/traffic.json traffic.json
+aws s3 cp s3://$S3_BUCKET/base_data/traffic.json traffic.json
 
 # Create ways index
 echo "Creating way index"

@@ -62,7 +62,7 @@ When the script is ran inside the container it follows these steps:
 - Runs the node eaul script
 - Uploads the result of each way to S3 as an individual file (in case the eaul script stops midway we won’t lose what was already done)
 
-It expects the following files to be available in the provided `S3_BUCKET` in a folder named `eaul/`:
+It expects the following files to be available in the provided `S3_BUCKET` in a folder named `base_data/`:
 - OD pairs - `od.geojson`
 - Road network in osm xml - `roadnetwork.osm`
 - Traffic data - `traffic.json`
