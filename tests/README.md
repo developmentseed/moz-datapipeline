@@ -53,15 +53,15 @@ In return period 9, segment 2 and 3 are 50% flooded. In return period 10, everyt
 ## Traffic
 Traffic is stable at 100 / day, for all directions on all OD pairs.
 
-## Notes on EAUL
+# Notes on EAUL
 
 - impact of upgrades on segment 7, 8 and 9 is most significant, as any upgrade will make it the fastest route. This route is also never flooded.
 - there is no impact of an upgrade on segment 1 on EAUL, as it doesn't affect routing in any way. The benefit of decrease in RUC is captured by another benefit.
 - there is no impact of an upgrade on segment 10, as it's never routable
 - segment 2 & 3 have an EAUL that is higher than the baseline. When upgrading one of these segments, the RUC without flood is much lower (~$2.72 for asphalt). In return period 9 & 10, the optimal route is not available and users are forced to use route 2 ($4.25) and route 3 ($4.45). This results in a higher increased user cost, and thus a higher EAUL.
 
-## Run the test
-From the root directory
+# Run the test
+From the root directory.
 
 Preparation
 ```
@@ -81,5 +81,5 @@ mv testrun/roadnetwork.osrm* testrun/osrm
 Run
 ```
 rm -rf testrun/eaul-workdir testrun/results
-node script-eaul/ testrun/ -o testrun/results
+node scripts/eaul/ testrun/ -o testrun/results
 ```

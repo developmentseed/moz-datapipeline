@@ -5,13 +5,13 @@ import Promise from 'bluebird';
 import OSRM from 'osrm';
 import program from 'commander';
 
-import { tStart, tEnd, jsonToFile, initLog } from '../scripts/utils/logging';
+import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
 import {
   createSpeedProfile,
   osrmContract,
   getRoadClass,
   getSurface
-} from '../scripts/utils/utils';
+} from '../utils/utils';
 
 const { ROOT_DIR } = process.env;
 
@@ -19,7 +19,7 @@ const { ROOT_DIR } = process.env;
  * Calculate the eaul for each improvement on the given ways
  *
  * Usage:
- *  $node ./script-eaul/ [options] <source-dir>
+ *  $node ./scripts/eaul/ [options] <source-dir>
  *
  */
 

@@ -4,8 +4,11 @@
 # AWS_ACCESS_KEY_ID
 # AWS_SECRET_ACCESS_KEY
 
+# Load environment variables set in .env file
+export $(grep -v '^#' .env | xargs)
+
 CONTROL=true
-ENV_VARS="AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY"
+ENV_VARS="AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY"
 
 for v in $ENV_VARS; do
   if [ -z "${!v}" ]; then
@@ -25,26 +28,13 @@ fi
 # - Enable CORS (Remove comment)
 
 TMP_DIR=./.tmp
-OUTPUT_DIR=./output
 
-AWS_BUCKET=$1
-
-if [ -z "$AWS_BUCKET" ]; then
-  echo "Bucket name not supplied"
-  echo "Usage:"
-  echo "  bash vector-tiles.sh [bucket]"
-  exit 1
-fi
-
-# Check if the road network geojson exists.
-if [ ! -f $OUTPUT_DIR/roadnetwork.geojson ]; then
-  echo 'File roadnetwork.geojson not found in output directory.'
-  exit 1
-fi
+aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork_with-ind.geojson $TMP_DIR/
+aws s3 cp s3://$AWS_BUCKET/base_data/bridges.geojson $TMP_DIR/
 
 # Delete destination if it exists
-rm -rf $OUTPUT_DIR/roadnetwork-tiles
+rm -rf $TMP_DIR/roadnetwork-tiles
 
-tippecanoe -e $OUTPUT_DIR/roadnetwork-tiles -B 8 -z 13 -L roads:$OUTPUT_DIR/roadnetwork.geojson -L bridges:$OUTPUT_DIR/bridges.geojson
+tippecanoe -e $TMP_DIR/roadnetwork-tiles -B 8 -z 13 -L roads:$TMP/roadnetwork_with-ind.geojson -L bridges:$TMP_DIR/bridges.geojson
 
-aws s3 sync $OUTPUT_DIR/roadnetwork-tiles/ s3://$AWS_BUCKET/ --delete --content-encoding gzip --acl public-read
+aws s3 sync $TMP_DIR/roadnetwork-tiles/ s3://$AWS_BUCKET/tiles/ --delete --content-encoding gzip --acl public-read
