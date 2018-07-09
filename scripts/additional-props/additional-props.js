@@ -1,4 +1,5 @@
 'use strict';
+import fetch from 'node-fetch';
 import fs from 'fs-extra';
 import path from 'path';
 import Promise from 'bluebird';
@@ -45,10 +46,6 @@ const provBoundaries = fs.readJsonSync(BOUND_FILES);
 clog('Loading bridge and culvert data');
 const bridgeData = fs.readJsonSync(BRIDGE_FILE);
 
-clog('Loading flood data');
-const floodDepths = fs.readJsonSync(FLOOD_DEPTH_FILE);
-const floodLengths = fs.readJsonSync(FLOOD_LENGTH_FILE);
-
 clog('Loading road network');
 // rnData will be modified by the functions.
 var rnData = fs.readJsonSync(RN_FILE);
@@ -74,7 +71,7 @@ function addBridgeInfo (way) {
     }));
 }
 
-function addFloodInfo (way) {
+function addFloodInfo (way, floodDepths, floodLengths) {
   const wayFloodDepths = floodDepths[way.properties.NAME];
   const wayFloodLengths = floodLengths[way.properties.NAME];
 
@@ -108,8 +105,12 @@ function run (rnData, floodDepths, floodLengths) {
       fs.ensureDir(LOG_DIR)
     ]);
 
+    clog('Loading flood data');
+    const floodDepths = await fetch(FLOOD_DEPTH_FILE).then(res => res.json());
+    const floodLengths = await fetch(FLOOD_LENGTH_FILE).then(res => res.json());
+
     tStart(`Total run time`)();
-    const data = run(rnData);
+    const data = run(rnData, floodDepths, floodLengths);
 
     fs.writeJsonSync(RN_FILE, data);
     tEnd(`Total run time`)();
