@@ -22,7 +22,6 @@ import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
 const LOG_DIR = path.resolve(__dirname, '../../log/merge-indicators');
 
 const TMP_DIR = path.resolve(__dirname, '../../.tmp');
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 
 const RN_FILE = path.resolve(TMP_DIR, 'roadnetwork.geojson');
 
@@ -56,14 +55,14 @@ async function run () {
 }
 
 /**
- * Gets a list of indicators in the output directory.
+ * Gets a list of indicators in the tmp directory.
  * Files must be named: indicator-[name].csv
  *
  * @return Promise{Array} File paths
  */
 function getIndicatorFiles () {
   return new Promise((resolve, reject) => {
-    glob(`${OUTPUT_DIR}/indicator-*.csv`, function (err, files) {
+    glob(`${TMP_DIR}/indicator-*.csv`, function (err, files) {
       if (err) return reject(err);
       return resolve(files);
     });
@@ -134,7 +133,6 @@ function attachIndicatorToRN (filePath) {
 (async function main () {
   try {
     await Promise.all([
-      fs.ensureDir(OUTPUT_DIR),
       fs.ensureDir(TMP_DIR),
       fs.ensureDir(LOG_DIR)
     ]);

@@ -114,7 +114,9 @@ echo "Prepare bridge data..."
 
 node ./scripts/prep-bridge $TMP_DIR/bridges.geojson $TMP_DIR/roadnetwork.geojson
 # Needed for the vector tiles.
-cp $TMP_DIR/bridges.geojson ./output
+
+echo "Upload bridges data to S3"
+aws s3 cp $TMP_DIR/bridges.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
 
 ###############################################################################
 #
@@ -208,10 +210,10 @@ echo "Preparing OD data..."
 ogr2ogr -f "GeoJSON" $TMP_DIR/od.geojson $OD_FILE
 node ./scripts/process-traffic ./source/od-pairs/traffic_matrix.csv
 # Od pairs and traffic.json are needed as a output file for the EAUL script.
-cp $TMP_DIR/od.geojson ./output/od.geojson
-cp $TMP_DIR/traffic.json ./output/traffic.json
 
-echo "All done preparing the OD data."
+echo "Uploading OD and traffic data to S3"
+aws s3 cp $TMP_DIR/od.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
+aws s3 cp $TMP_DIR/traffic.json s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
 
 
 ###############################################################################
@@ -239,19 +241,10 @@ node ./scripts/additional-props/index.js
 echo "Converting RN to osm..."
 python ./libs/ogr2osm/ogr2osm.py .tmp/roadnetwork.geojson --split-ways 1 -t ./libs/ogr2osm/default_translation.py -o .tmp/roadnetwork.osm -f --positive-id
 # OSM Road Network is needed as a output file for the EAUL script.
-cp $TMP_DIR/roadnetwork.osm ./output/roadnetwork.osm
 
-
-###############################################################################
-#
-# 9. Upload files to S3
-#
-
-echo "Uploading data to S3"
+echo "Uploading RN data to S3"
 aws s3 cp $TMP_DIR/roadnetwork.osm s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
 aws s3 cp $TMP_DIR/roadnetwork.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
-aws s3 cp $TMP_DIR/bridges.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
-aws s3 cp $TMP_DIR/od.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
-aws s3 cp $TMP_DIR/traffic.json s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
+
 
 echo "All done preparing the base data."

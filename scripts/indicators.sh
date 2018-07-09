@@ -61,6 +61,9 @@ node ./scripts/indicator-from-prop/index.js AADT
 # Calculate link criticality
 bash scripts/criticality/criticality.sh
 
+# Calculate the EAD on each segment
+node ./scripts/vulnerability
+
 # Backup RN before adding indicators
 cp $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork_no-indi.geojson
 
