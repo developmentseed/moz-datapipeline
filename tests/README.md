@@ -83,3 +83,10 @@ Run
 rm -rf testrun/eaul-workdir testrun/results
 node scripts/eaul/ testrun/ -o testrun/results
 ```
+
+To test on a sub-set of road segments, use:
+
+```
+node scripts/eaul/ testrun/ -o testrun/results --job-id 2 --total-jobs 2
+
+```

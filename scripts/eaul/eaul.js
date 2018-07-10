@@ -23,16 +23,11 @@ const { ROOT_DIR } = process.env;
  *
  */
 
-const createWaysIndexObj = (string) => {
-  let obj = {};
-  string.split(',').forEach(w => { obj[w] = true; });
-  return obj;
-};
-
 program.version('0.1.0')
   .option('-l <dir>', 'log directory. If not provided one will be created in the source dir')
   .option('-o <dir>', 'Results directory. If not provided one will be created in the source dir')
-  .option('-w, --ways <ways>', 'Way ids comma separated (10,1,5,13). If none provided the whole list is used.', createWaysIndexObj)
+  .option('-t --total-jobs <n>', 'Total number of jobs to parallelize this on. If not provided, all the road segments are processed.')
+  .option('-i --job-id <n>', 'ID of the job. The job id determines what portion of the road network will be analyzed. Should be a number between 1 and the --total-jobs.')
   .description('Calculate the eaul for each improvement on the given ways')
   .usage('[options] <source-dir>')
   .parse(process.argv);
@@ -64,8 +59,25 @@ const odPairs = fs.readJsonSync(OD_FILE);
 var allWaysList = fs.readJsonSync(WAYS_FILE);
 const trafficData = fs.readJsonSync(TRAFFIC_FILE);
 
-// Filter ways according to input.
-var waysList = program.ways ? allWaysList.filter(w => program.ways[w.id]) : allWaysList;
+if (program.totalJobs && !program.jobId) {
+  throw new Error(`You have to specify a job id when using --total-jobs.`)
+}
+
+if (program.totalJobs && program.jobId > program.totalJobs) {
+  throw new Error(`The job id (${program.jobId}) can't be bigger than the total number of jobs (${program.totalJobs}).`)
+}
+
+// Build array of road segments to process
+let wayIndexFrom = ((program.jobId - 1) * Math.floor(allWaysList.length / program.totalJobs))
+let wayIndexTo = program.jobId === program.totalJobs ? allWaysList.length : program.jobId * Math.floor(allWaysList.length / program.totalJobs);
+var waysList = allWaysList;
+
+if (program.totalJobs) {
+  waysList = allWaysList.slice(wayIndexFrom, wayIndexTo);
+  clog(`Job ${program.jobId}/${program.totalJobs}. Generating results for segments ${wayIndexFrom} - ${wayIndexTo}.`)
+} else {
+  clog(`Generating results for all the road segments.`)
+}
 
 if (!waysList.length) {
   // waysList = waysList.slice(300, 301);
@@ -188,13 +200,13 @@ function parseFloodXML (floodData) {
   }, {});
 }
 
-const floodDepth = waysList.reduce((acc, way) => {
+const floodDepth = allWaysList.reduce((acc, way) => {
   const {NAME, flood_depths} = way.tags;
   acc[NAME] = parseFloodXML(flood_depths)
   return acc;
 }, {});
 
-const floodLength = waysList.reduce((acc, way) => {
+const floodLength = allWaysList.reduce((acc, way) => {
   const {NAME, flood_lengths} = way.tags;
   acc[NAME] = parseFloodXML(flood_lengths)
   return acc;
@@ -359,7 +371,6 @@ function getImpassableWays (retPeriod, upgradeWay, upgrade) {
   return allWaysList.filter(way => {
     // Get Wlcc for this way, for the return period.
     let wlcc = floodDepth[way.tags.NAME][retPeriod];
-
     // Get Water Level that this road was designed for.
     let wld = floodDepth[way.tags.NAME][ROAD_DESIGNSTANDARD];
 
