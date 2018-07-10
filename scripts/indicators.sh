@@ -59,7 +59,7 @@ node ./scripts/indicator-from-areas/index.js .tmp/district_boundaries.geojson PO
 node ./scripts/indicator-from-prop/index.js AADT
 
 # Calculate link criticality
-bash scripts/criticality/criticality.sh
+bash ./scripts/criticality/criticality.sh
 
 # Calculate the EAD on each segment
 node ./scripts/vulnerability
@@ -69,6 +69,22 @@ cp $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork_no-indi.geojson
 
 # Attach indicators to RN
 node ./scripts/merge-indicators/index.js
+
+
+###############################################################################
+#
+# Merge the EAUL results. These are stored on S3 in individual files.
+#
+
+mkdir .tmp/eaul-results
+
+# Download RN and OD pairs
+echo "Download EAUL results from S3"
+aws s3 cp s3://$AWS_BUCKET/eaul/results/ $TMP_DIR/eaul-results --recursive --exclude "*" --include "result-*"
+
+# Merge back into the rn
+echo "Merging EAUL results"
+node ./scripts/merge-eaul/ $TMP_DIR/eaul-results --rn $TMP_DIR/roadnetwork.geojson -o $TMP_DIR/roadnetwork.geojson
 
 
 ###############################################################################
