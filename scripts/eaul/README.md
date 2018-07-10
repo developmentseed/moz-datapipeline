@@ -38,7 +38,7 @@ Traffic data between OD pairs with the following structure:
 The script can be ran locally without docker. In this case run the node script directly bypassing the `eaul.sh`
 Useful during development.
 ```
-node scripts/eaul/ scripts/eaul/.tmp/ -l log/eaul -w 21926,22672
+node scripts/eaul/ scripts/eaul/.tmp/ -l log/eaul --total-jobs 10 --job-id 2
 
 Usage: scripts/eaul [options] <source-dir>
 
@@ -46,11 +46,17 @@ Usage: scripts/eaul [options] <source-dir>
 
   Options:
 
-    -V, --version      output the version number
-    -l <dir>           log directory. If not provided one will be created in the source dir
-    -o <dir>           Results directory. If not provided one will be created in the source dir
-    -w, --ways <ways>  Way ids comma separated (10,1,5,13). If none provided the whole list is used.
-    -h, --help         output usage information
+    -V, --version       output the version number
+    -l <dir>            log directory. If not provided one will be created in
+                        the source dir
+    -o <dir>            Results directory. If not provided one will be created
+                        in the source dir
+    -t --total-jobs <n> Total number of jobs to parallelize this on. If not
+                        provided, all the road segments are processed.
+    -i --job-id <n>     ID of the job. The job id determines what portion of the
+                        road network will be analyzed. Should be a number
+                        between 1 and the --totaljobs.
+    -h, --help          output usage information
 ```
 
 ## Running with docker

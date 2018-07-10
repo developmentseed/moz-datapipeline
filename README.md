@@ -54,10 +54,6 @@ See the [EAUL script README.md](./scripts/eaul/README.md) for more information.
 
 When to run: **only** when one of the input datasets changes (road network, OD and traffic). Make sure to run step 3 first.
 
-### 4. Adding EAUL results to the road network (instructions are WIP)
-Once the EAUL processing finished, the results can be added to the road network. This is a relatively fast operation that can be ran locally using the same docker container that contains the pipeline.
-See the [README.md](./scripts/merge-eaul/README.md) for instructions.
-
 ### 5. Indicator pipeline
 This script computes the prioritization indicators and generates the final Vector Tiles used by the application.
 The vector tiles script uses the Road Network and the Bridges on the S3 folder and uploads the resulting vector tiles to the S3 bucket.

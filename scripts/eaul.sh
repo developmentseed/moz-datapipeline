@@ -39,9 +39,8 @@ aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork.osm roadnetwork.osm
 echo "Download file traffic information"
 aws s3 cp s3://$AWS_BUCKET/base_data/traffic.json traffic.json
 
-# Create ways index
-echo "Creating way index"
-node /var/pipeline/scripts/utils/extract-ways.js /var/pipeline/.tmp
+echo "Download OSM Ways file"
+aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork-osm-ways.json roadnetwork-osm-ways.json
 
 # Create base OSRM
 echo "Running OSRM"

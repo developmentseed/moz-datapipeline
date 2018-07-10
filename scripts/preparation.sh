@@ -239,12 +239,15 @@ node ./scripts/additional-props/index.js
 #
 
 echo "Converting RN to osm..."
-python ./libs/ogr2osm/ogr2osm.py .tmp/roadnetwork.geojson --split-ways 1 -t ./libs/ogr2osm/default_translation.py -o .tmp/roadnetwork.osm -f --positive-id
+python ./libs/ogr2osm/ogr2osm.py $TMP_DIR/roadnetwork.geojson --split-ways 1 -t ./libs/ogr2osm/default_translation.py -o $TMP_DIR/roadnetwork.osm -f --positive-id
 # OSM Road Network is needed as a output file for the EAUL script.
+
+echo "Extract way IDs for other scripts to use"
+node ./scripts/utils/extract-ways $TMP_DIR
 
 echo "Uploading RN data to S3"
 aws s3 cp $TMP_DIR/roadnetwork.osm s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
+aws s3 cp $TMP_DIR/roadnetwork-osm-ways.json s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
 aws s3 cp $TMP_DIR/roadnetwork.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
-
 
 echo "All done preparing the base data."
