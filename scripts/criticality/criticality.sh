@@ -1,9 +1,5 @@
 #! /bin/bash
 
-# Create ways index
-echo "Creating way index"
-node scripts/utils/extract-ways.js .tmp/
-
 # Create base OSRM
 echo "Running OSRM"
 # Copy the profile file to a folder accessible by the docker.
