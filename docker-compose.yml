@@ -10,7 +10,7 @@ services:
       # available inside the container we need to pass a variable.
       - ROOT_DIR=${PWD}
       # Set via env:
-      # - S3_BUCKET
+      # - AWS_BUCKET
       # - AWS_ACCESS_KEY_ID
       # - AWS_SECRET_ACCESS_KEY
     build: ./

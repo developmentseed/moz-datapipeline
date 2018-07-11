@@ -4,19 +4,17 @@
 # AWS_BUCKET
 # AWS_ACCESS_KEY_ID
 # AWS_SECRET_ACCESS_KEY
-# WAY_IDS
+# TOTAL_JOBS
+# JOB_ID
 # ROOT_DIR
 
-# Load environment variables set in .env file
-export $(grep -v '^#' .env | xargs)
-
 CONTROL=true
-ENV_VARS="AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY WAY_IDS ROOT_DIR"
+ENV_VARS="AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY TOTAL_JOBS JOB_ID ROOT_DIR"
 
 for v in $ENV_VARS; do
   if [ -z "${!v}" ]; then
-      echo "Missing env variable: $v"
-      CONTROL=false
+    echo "Missing env variable: $v"
+    CONTROL=false
   fi
 done
 
@@ -54,7 +52,7 @@ mv roadnetwork.osrm* ./osrm
 
 # Running eaul
 echo "Calc eaul"
-node --max_old_space_size=4096 /var/pipeline/scripts/eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results --ways $WAY_IDS
+node --max_old_space_size=4096 /var/pipeline/scripts/eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results  --job-id $JOB_ID --total-jobs $TOTAL_JOBS
 
 # Upload results
 echo "Upload results"
