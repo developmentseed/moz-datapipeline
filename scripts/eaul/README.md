@@ -76,14 +76,16 @@ The docker image expects some env vars to be set:
 - `AWS_BUCKET` - Bucket from where to download and upload files
 - `AWS_ACCESS_KEY_ID` - Aws access key
 - `AWS_SECRET_ACCESS_KEY` - Aws access secret
+- `TOTAL_JOBS` - The total number of jobs to parallelize this on. The road segments will be divided among the jobs.
+- `JOB_ID` - ID of the job. The job id determines what portion of the road network will be analyzed. Should be a number between 1 and TOTAL_JOBS.
 - `ROOT_DIR` - Root directory, usually `$(pwd)`. See below for an explanation.
-- `WAY_IDS` - Way ids to process. Used to divide the processing into chunks.
 
 Example run code:
 ```
 docker run -it --rm \
   -v $(pwd)/scripts/eaul/.tmp:/var/pipeline/.tmp \
   -v /var/run/docker.sock:/var/run/docker.sock \
+  moz-datapipeline \
   bash ./scripts/eaul.sh
 ```
 
