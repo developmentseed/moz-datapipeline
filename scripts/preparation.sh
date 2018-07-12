@@ -229,6 +229,9 @@ aws s3 cp $TMP_DIR/traffic.json s3://$AWS_BUCKET/base_data/ --content-encoding g
 
 echo "Add additional properties to road network..."
 
+aws s3 cp s3://$AWS_BUCKET/fluvial-pluvial/current/roadnetwork_stats-max.json $TMP_DIR
+aws s3 cp s3://$AWS_BUCKET/fluvial-pluvial/current/roadnetwork_stats-percent.json $TMP_DIR
+
 # Additional properties to be included in the roadnetwork geojson
 node ./scripts/additional-props/index.js
 
