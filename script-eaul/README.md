@@ -38,9 +38,9 @@ Traffic data between OD pairs with the following structure:
 The script can be ran locally without docker. In this case run the node script directly bypassing the `eaul.sh`
 Useful during development.
 ```
-node scripts/eaul/ scripts/eaul/.tmp/ -l log/eaul --total-jobs 10 --job-id 2
+node script-eaul/ script-eaul/.tmp/ -l log/eaul --total-jobs 10 --job-id 2
 
-Usage: scripts/eaul [options] <source-dir>
+Usage: script-eaul [options] <source-dir>
 
   Calculate the eaul for each improvement on the given ways
 
@@ -83,10 +83,15 @@ The docker image expects some env vars to be set:
 Example run code:
 ```
 docker run -it --rm \
-  -v $(pwd)/scripts/eaul/.tmp:/var/pipeline/.tmp \
+  -v $(pwd)/script-eaul/.tmp:/var/pipeline/.tmp \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  moz-datapipeline \
-  bash ./scripts/eaul.sh
+  -e AWS_BUCKET=mozambique-road-planning \
+  -e AWS_ACCESS_KEY_ID='code here' \ 
+  -e AWS_SECRET_ACCESS_KEY='secret here' \ 
+  -e ROOT_DIR=$(pwd)/script-eaul \ 
+  -e TOTAL_JOBS=12 \
+  -e JOB_ID=2 \
+  moz-eaul
 ```
 
 The results will be uploaded to the provided s3 bucket under `eaul/results/`. This folder will also include a file with the unroutable pairs found during the processing.
@@ -95,4 +100,4 @@ The results will be uploaded to the provided s3 bucket under `eaul/results/`. Th
 When running docker in docker the volume bindings in the inner docker are always relative to the root because we're using the same socket.
 Because of this whenever we need to access one of the root volumes, we need to use the full path. Since this is not naturally available inside the container we need to pass a variable.
 This is basically the path to where the `.tmp` volume bind is.
-If the volume bind is `$(pwd)/scripts/eaul/.tmp:/var/pipeline/.tmp` then `ROOT_DIR` will be `$(pwd)/scripts/eaul`.
+If the volume bind is `$(pwd)/script-eaul/.tmp:/var/pipeline/.tmp` then `ROOT_DIR` will be `$(pwd)/script-eaul`.

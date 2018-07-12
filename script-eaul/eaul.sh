@@ -40,6 +40,10 @@ aws s3 cp s3://$AWS_BUCKET/base_data/traffic.json traffic.json
 echo "Download OSM Ways file"
 aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork-osm-ways.json roadnetwork-osm-ways.json
 
+echo "Download flood data"
+aws s3 cp s3://$AWS_BUCKET/fluvial-pluvial/current/roadnetwork_stats-max.json roadnetwork_stats-max.json
+aws s3 cp s3://$AWS_BUCKET/fluvial-pluvial/current/roadnetwork_stats-percent.json roadnetwork_stats-percent.json
+
 # Create base OSRM
 echo "Running OSRM"
 # Copy the profile file to a folder accessible by the docker.
@@ -52,7 +56,7 @@ mv roadnetwork.osrm* ./osrm
 
 # Running eaul
 echo "Calc eaul"
-node --max_old_space_size=4096 /var/pipeline/scripts/eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results  --job-id $JOB_ID --total-jobs $TOTAL_JOBS
+node --max_old_space_size=4096 /var/pipeline/script-eaul/ /var/pipeline/.tmp -o /var/pipeline/.tmp/results --job-id $JOB_ID --total-jobs $TOTAL_JOBS
 
 # Upload results
 echo "Upload results"

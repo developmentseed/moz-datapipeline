@@ -5,13 +5,13 @@ import Promise from 'bluebird';
 import OSRM from 'osrm';
 import program from 'commander';
 
-import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
+import { tStart, tEnd, jsonToFile, initLog } from '../scripts/utils/logging';
 import {
   createSpeedProfile,
   osrmContract,
   getRoadClass,
   getSurface
-} from '../utils/utils';
+} from '../scripts/utils/utils';
 
 const { ROOT_DIR } = process.env;
 
@@ -19,7 +19,7 @@ const { ROOT_DIR } = process.env;
  * Calculate the eaul for each improvement on the given ways
  *
  * Usage:
- *  $node ./scripts/eaul/ [options] <source-dir>
+ *  $node ./script-eaul/ [options] <source-dir>
  *
  */
 
@@ -50,31 +50,43 @@ const OSRM_FOLDER = path.resolve(SOURCE_DIR, 'osrm');
 const WAYS_FILE = path.resolve(SOURCE_DIR, 'roadnetwork-osm-ways.json');
 const TRAFFIC_FILE = path.resolve(SOURCE_DIR, 'traffic.json');
 
+// Flood depth file contains max flood depths for road segment
+// Flood length file contains percent of road flooded
+const FLOOD_DEPTH_FILE = path.resolve(SOURCE_DIR, 'roadnetwork_stats-max.json');
+const FLOOD_LENGTH_FILE = path.resolve(SOURCE_DIR, 'roadnetwork_stats-percent.json');
+
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Using OD Pairs', OD_FILE);
 clog('Using RN Ways', WAYS_FILE);
 clog('Using Traffic', TRAFFIC_FILE);
+clog('Using Flood Depths', FLOOD_DEPTH_FILE);
+clog('Using Flood Lengths', FLOOD_LENGTH_FILE);
 const odPairs = fs.readJsonSync(OD_FILE);
 var allWaysList = fs.readJsonSync(WAYS_FILE);
 const trafficData = fs.readJsonSync(TRAFFIC_FILE);
+const floodDepth = fs.readJsonSync(FLOOD_DEPTH_FILE);
+const floodLength = fs.readJsonSync(FLOOD_LENGTH_FILE);
 
 if (program.totalJobs && !program.jobId) {
   throw new Error(`You have to specify a job id when using --total-jobs.`)
 }
 
-if (program.totalJobs && program.jobId > program.totalJobs) {
-  throw new Error(`The job id (${program.jobId}) can't be bigger than the total number of jobs (${program.totalJobs}).`)
+if (program.totalJobs && parseInt(program.jobId) > parseInt(program.totalJobs)) {
+  throw new Error(`The job id (--job-id ${program.jobId}) can't exceed the total number of jobs (--total-jobs ${program.totalJobs}).`)
 }
 
+let totalJobs = parseInt(program.totalJobs)
+let jobId = parseInt(program.jobId)
+
 // Build array of road segments to process
-let wayIndexFrom = ((program.jobId - 1) * Math.floor(allWaysList.length / program.totalJobs))
-let wayIndexTo = program.jobId === program.totalJobs ? allWaysList.length : program.jobId * Math.floor(allWaysList.length / program.totalJobs);
+let wayIndexFrom = ((jobId - 1) * Math.floor(allWaysList.length / totalJobs))
+let wayIndexTo = jobId === totalJobs ? allWaysList.length : jobId * Math.floor(allWaysList.length / totalJobs);
 var waysList = allWaysList;
 
-if (program.totalJobs) {
+if (totalJobs) {
   waysList = allWaysList.slice(wayIndexFrom, wayIndexTo);
-  clog(`Job ${program.jobId}/${program.totalJobs}. Generating results for segments ${wayIndexFrom} - ${wayIndexTo}.`)
+  clog(`Job ${jobId}/${totalJobs}. Generating results for segments ${wayIndexFrom} - ${wayIndexTo}.`)
 } else {
   clog(`Generating results for all the road segments.`)
 }
@@ -188,29 +200,6 @@ const ROAD_UPGRADES = [
     condition: 'good'
   }
 ];
-
-// Construct flood matrix from the info on the RN.
-// Value on the rn will be something like (10:0,0,0,0,0,0,0,0,0,0)
-// Convert to {"name": {"10": 2.06, "20": 2.29}
-function parseFloodXML (floodData) {
-  const floodLevel = floodData.match(/\(10:(.+)\)/)[1].split(',');
-  return FLOOD_RETURN_PERIOD.reduce((_acc, ret, idx) => {
-    _acc[ret] = parseFloat(floodLevel[idx]);
-    return _acc;
-  }, {});
-}
-
-const floodDepth = allWaysList.reduce((acc, way) => {
-  const {NAME, flood_depths} = way.tags;
-  acc[NAME] = parseFloodXML(flood_depths)
-  return acc;
-}, {});
-
-const floodLength = allWaysList.reduce((acc, way) => {
-  const {NAME, flood_lengths} = way.tags;
-  acc[NAME] = parseFloodXML(flood_lengths)
-  return acc;
-}, {});
 
 class ODPairStatusTracker {
   constructor (odPairs) {
@@ -657,8 +646,10 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
   for (let i = 0; i <= t.length - 2; i++) {
     // Increased User Cost of `i`.
     const ui = calcIncreasedUserCost(t[i], odPairs, baselineRUCFiltered, odPairsFloodRUCFiltered[i], upgradeWay, upgrade);
+
     // Increased User Cost of `i + 1`.
     const ui1 = calcIncreasedUserCost(t[i + 1], odPairs, baselineRUCFiltered, odPairsFloodRUCFiltered[i + 1], upgradeWay, upgrade);
+
     floodSum += (1 / t[i] - 1 / t[i + 1]) * (ui + ui1);
   }
 

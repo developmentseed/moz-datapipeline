@@ -36,8 +36,8 @@ const BOUND_FILES = path.resolve(SRC_DIR, 'prov_boundaries.geojson');
 
 // Flood depth file contains max flood depths for road segment
 // Flood length file contains percent of road flooded
-const FLOOD_DEPTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-max.json';
-const FLOOD_LENGTH_FILE = 'https://s3.amazonaws.com/mozambique-road-planning/fluvial-pluvial/current/roadnetwork_stats-percent.json';
+const FLOOD_DEPTH_FILE = path.resolve(SRC_DIR, 'roadnetwork_stats-max.json');
+const FLOOD_LENGTH_FILE = path.resolve(SRC_DIR, 'roadnetwork_stats-percent.json');
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -49,6 +49,10 @@ const bridgeData = fs.readJsonSync(BRIDGE_FILE);
 clog('Loading road network');
 // rnData will be modified by the functions.
 var rnData = fs.readJsonSync(RN_FILE);
+
+clog('Loading flood data');
+const floodDepths = fs.readJsonSync(FLOOD_DEPTH_FILE);
+const floodLengths = fs.readJsonSync(FLOOD_LENGTH_FILE);
 
 function addWayLength (way) {
   // Add length
@@ -71,7 +75,7 @@ function addBridgeInfo (way) {
     }));
 }
 
-function addFloodInfo (way, floodDepths, floodLengths) {
+function addFloodInfo (way) {
   const wayFloodDepths = floodDepths[way.properties.NAME];
   const wayFloodLengths = floodLengths[way.properties.NAME];
 
@@ -105,12 +109,8 @@ function run (rnData, floodDepths, floodLengths) {
       fs.ensureDir(LOG_DIR)
     ]);
 
-    clog('Loading flood data');
-    const floodDepths = await fetch(FLOOD_DEPTH_FILE).then(res => res.json());
-    const floodLengths = await fetch(FLOOD_LENGTH_FILE).then(res => res.json());
-
     tStart(`Total run time`)();
-    const data = run(rnData, floodDepths, floodLengths);
+    const data = run(rnData);
 
     fs.writeJsonSync(RN_FILE, data);
     tEnd(`Total run time`)();
