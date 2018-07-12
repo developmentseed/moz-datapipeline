@@ -96,7 +96,14 @@ docker run -it --rm \
 
 The results will be uploaded to the provided s3 bucket under `eaul/results/`. This folder will also include a file with the unroutable pairs found during the processing.
 
-#### ROOT_DIR (explanation)
+## Building the image
+To build the image we need to use the Dockerfile in `script-eaul/`, but it has to be built with the global context because it needs files that are in the root directory.
+
+```
+docker build -t moz-eaul -f script-eaul/Dockerfile .
+```
+
+### ROOT_DIR (explanation)
 When running docker in docker the volume bindings in the inner docker are always relative to the root because we're using the same socket.
 Because of this whenever we need to access one of the root volumes, we need to use the full path. Since this is not naturally available inside the container we need to pass a variable.
 This is basically the path to where the `.tmp` volume bind is.
