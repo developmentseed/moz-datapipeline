@@ -50,14 +50,23 @@ const OSRM_FOLDER = path.resolve(SOURCE_DIR, 'osrm');
 const WAYS_FILE = path.resolve(SOURCE_DIR, 'roadnetwork-osm-ways.json');
 const TRAFFIC_FILE = path.resolve(SOURCE_DIR, 'traffic.json');
 
+// Flood depth file contains max flood depths for road segment
+// Flood length file contains percent of road flooded
+const FLOOD_DEPTH_FILE = path.resolve(SOURCE_DIR, 'roadnetwork_stats-max.json');
+const FLOOD_LENGTH_FILE = path.resolve(SOURCE_DIR, 'roadnetwork_stats-percent.json');
+
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
 clog('Using OD Pairs', OD_FILE);
 clog('Using RN Ways', WAYS_FILE);
 clog('Using Traffic', TRAFFIC_FILE);
+clog('Using Flood Depths', FLOOD_DEPTH_FILE);
+clog('Using Flood Lengths', FLOOD_LENGTH_FILE);
 const odPairs = fs.readJsonSync(OD_FILE);
 var allWaysList = fs.readJsonSync(WAYS_FILE);
 const trafficData = fs.readJsonSync(TRAFFIC_FILE);
+const floodDepth = fs.readJsonSync(FLOOD_DEPTH_FILE);
+const floodLength = fs.readJsonSync(FLOOD_LENGTH_FILE);
 
 if (program.totalJobs && !program.jobId) {
   throw new Error(`You have to specify a job id when using --total-jobs.`)
@@ -191,29 +200,6 @@ const ROAD_UPGRADES = [
     condition: 'good'
   }
 ];
-
-// Construct flood matrix from the info on the RN.
-// Value on the rn will be something like (10:0,0,0,0,0,0,0,0,0,0)
-// Convert to {"name": {"10": 2.06, "20": 2.29}
-function parseFloodXML (floodData) {
-  const floodLevel = floodData.match(/\(10:(.+)\)/)[1].split(',');
-  return FLOOD_RETURN_PERIOD.reduce((_acc, ret, idx) => {
-    _acc[ret] = parseFloat(floodLevel[idx]);
-    return _acc;
-  }, {});
-}
-
-const floodDepth = allWaysList.reduce((acc, way) => {
-  const {NAME, flood_depths} = way.tags;
-  acc[NAME] = parseFloodXML(flood_depths)
-  return acc;
-}, {});
-
-const floodLength = allWaysList.reduce((acc, way) => {
-  const {NAME, flood_lengths} = way.tags;
-  acc[NAME] = parseFloodXML(flood_lengths)
-  return acc;
-}, {});
 
 class ODPairStatusTracker {
   constructor (odPairs) {
@@ -418,19 +404,12 @@ function calcFloodRepairTime (retPeriod, upgradeWay, upgrade) {
     // Calculate the length flooded
     const lenFlooded = parseFloat(way.tags.length * (floodLength[way.tags.NAME][retPeriod]) / 100) / 1000;
 
-    if (isNaN(lenFlooded)) {
-      console.log()
-      console.log('way tags', way.tags)
-      console.log('floodLength', floodLength[way.tags.NAME])
-    }
-
     // Repair time is in hours / km. Calculate total number of days based on
     // length of flooded segment
     const rTime = lenFlooded * FLOOD_REPAIRTIME[severity][roadSurface][roadClass] / 24;
 
     return Math.max(rTime, max);
   }, 0);
-  console.log(retPeriod, repairTime)
 
   return repairTime;
 }
@@ -589,22 +568,9 @@ function calcIncreasedUserCost (retPeriod, odPairs, baselineRUC, odPairsFloodRUC
   const sum = odPairsFloodRUC.reduce((acc, odPairRUC, idx) => {
     const origin = odPairs[odPairRUC.oIdx];
     const destination = odPairs[odPairRUC.dIdx];
-    // if (retPeriod = 50) {
-    //   console.log('acc', acc)
-    //   console.log('odPairRUC', odPairRUC)
-    //   console.log('ruc odi', odPairRUC.ruc)
-    //   console.log('ruc baseline', baselineRUC[idx].ruc)
-    //   console.log('traffic', getODPairTraffic(origin, destination))
-    // }
     return acc + (odPairRUC.ruc - baselineRUC[idx].ruc) * getODPairTraffic(origin, destination);
   }, 0);
-  console.log('r', r)
-  console.log('sum', sum)
-  // console.log('retPeriod', retPeriod)
-  // console.log('baselineRUC.length', baselineRUC.length)
-  // console.log('odPairsFloodRUC.length', odPairsFloodRUC.length)
-  // console.log('upgradeWay', upgradeWay)
-  // console.log('upgrade', upgrade)
+
   return r * sum;
 }
 
@@ -680,13 +646,12 @@ async function calcEaul (osrmFolder, odPairs, floodOSRMFiles, identifier = 'all'
   for (let i = 0; i <= t.length - 2; i++) {
     // Increased User Cost of `i`.
     const ui = calcIncreasedUserCost(t[i], odPairs, baselineRUCFiltered, odPairsFloodRUCFiltered[i], upgradeWay, upgrade);
-    // console.log('ui', identifier, ui)
+
     // Increased User Cost of `i + 1`.
     const ui1 = calcIncreasedUserCost(t[i + 1], odPairs, baselineRUCFiltered, odPairsFloodRUCFiltered[i + 1], upgradeWay, upgrade);
 
     floodSum += (1 / t[i] - 1 / t[i + 1]) * (ui + ui1);
   }
-  // console.log('floodSum', identifier, floodSum)
 
   const eaul = 1 / 2 * floodSum;
 

@@ -69,6 +69,8 @@ mkdir -p testrun/osrm
 cp tests/fixtures/od.geojson testrun
 cp tests/fixtures/roadnetwork.osm testrun
 cp tests/fixtures/traffic.json testrun
+cp tests/fixtures/roadnetwork_stats-max.json testrun
+cp tests/fixtures/roadnetwork_stats-percent.json testrun
 cp scripts/utils/moz.lua testrun
 
 node scripts/utils/extract-ways.js testrun
