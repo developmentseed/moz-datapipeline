@@ -60,4 +60,4 @@ node --max_old_space_size=4096 /var/pipeline/script-eaul/ /var/pipeline/.tmp -o 
 
 # Upload results
 echo "Upload results"
-aws s3 sync /var/pipeline/.tmp/results/ s3://$AWS_BUCKET/eaul/results/ --delete
+aws s3 sync /var/pipeline/.tmp/results/ s3://$AWS_BUCKET/eaul/results/
