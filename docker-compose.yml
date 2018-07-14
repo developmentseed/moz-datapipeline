@@ -9,6 +9,10 @@ services:
       # (like source) we need to use the full path. Since this is not naturally
       # available inside the container we need to pass a variable.
       - ROOT_DIR=${PWD}
+      # Set via env:
+      # - AWS_BUCKET
+      # - AWS_ACCESS_KEY_ID
+      # - AWS_SECRET_ACCESS_KEY
     build: ./
     container_name: moz-datapipeline
     volumes:
@@ -23,4 +27,3 @@ services:
         target: /var/pipeline/source
         read_only: true
       - /var/run/docker.sock:/var/run/docker.sock
-    command: bash ./main.sh

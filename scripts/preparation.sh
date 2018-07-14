@@ -4,6 +4,29 @@
 
 TMP_DIR=./.tmp
 
+# Expects some env variables to be set:
+# AWS_BUCKET
+# AWS_ACCESS_KEY_ID
+# AWS_SECRET_ACCESS_KEY
+
+# Load environment variables set in .env file
+export $(grep -v '^#' .env | xargs)
+
+CONTROL=true
+ENV_VARS="AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY"
+
+for v in $ENV_VARS; do
+  if [ -z "${!v}" ]; then
+      echo "Missing env variable: $v"
+      CONTROL=false
+  fi
+done
+
+if [ "$CONTROL" = false ]; then
+ exit 1
+fi
+
+
 # Check if a required file exists and assign the full path to a variable.
 #
 # Parameters:
@@ -38,56 +61,33 @@ function checkRequiredFile() {
 ###############################################################################
 #
 # 0. Basic housekeeping
+#
 
 echo 'Basic housekeeping...'
 
 # Check for required files and directories
-checkRequiredFile './source/road-network' '*.shp' RN_FILE
 checkRequiredFile './source/bridges' '*.csv' BRIDGE_FILE
 checkRequiredFile './source/province-boundaries' '*.shp' PROVINCE_FILE
 checkRequiredFile './source/district-boundaries' '*.shp' DISTRICT_FILE
 checkRequiredFile './source/agriculture' '*.shp' AG_FILE
 checkRequiredFile './source/od-pairs' '*.shp' OD_FILE
+checkRequiredFile './source/od-pairs/' 'traffic_matrix.csv' OD_TRAFFIC_FILE
 
 # Set up or clean the temp directory
 if [ -d "$TMP_DIR" ]; then
-  rm -rf $TMP_DIR
+  rm -rf $TMP_DIR/*
 fi
 mkdir $TMP_DIR
 
 
 ###############################################################################
 #
-# 1. Generate base road network data
-# 
-# Ingest the ANE road network data and perform:
-#   - a cleanup of the fields. Only keep:
-#       NAME (String) - unique id of the road segment. Example: R850-T2150
-#       ROAD_NAME (String) - name of the road. Example: Combomune -- Macandze
-#       ROAD_ID (String) - id of the road the segment belongs to. Example: R850
-#       ROAD_CLASS (String) - Example: Vicinal
-#       SURF_TYPE (String) - Example: Unpaved
-#       PAVE_WIDTH (String) - Example: 3.5m
-#       AVG_COND (String) - Example: Fair
-#       PROVINCE (String) - Example: Gaza
-#       AADT (Real) - average annual daily traffic Example: 70.000000
-#       RUC (Real) - Road User Cost per kilometer. Example: 0.112476
-#   - remove features that have no geometry
-#   - reproject to EPSG:4326
-#   - store it in GeoJSON format
+# 1. Download base road network data from S3
+#
 
-echo "Prepare road network data..."
+echo "Download road network data from S3..."
 
-# Write to temp file. This is a separate command so we know the layer name in subsequent ones
-ogr2ogr $TMP_DIR/roadnetwork.shp "$RN_FILE" \
-  -t_srs "EPSG:4326"
-
-ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp \
-  -dialect sqlite \
-  -sql "SELECT NAME, ROAD_NAME, ROAD_ID, ROAD_CLASS, SURF_TYPE, PAVE_WIDTH, AVG_COND, PROVINCE, AADT, RUC, geometry \
-    FROM roadnetwork \
-    WHERE geometry is not null" \
-  -nln roadnetwork
+aws s3 cp s3://$AWS_BUCKET/base_data/basenetwork.geojson $TMP_DIR/roadnetwork.geojson
 
 
 ###############################################################################
@@ -106,13 +106,17 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/roadnetwork.geojson $TMP_DIR/roadnetwork.shp \
 #     - add ID of the closest road
 #     - add a type (bridge / culvert) based on the name
 #     - add length of 7 in case there is no data on length
+#
 
 echo "Prepare bridge data..."
 
 ./node_modules/.bin/csv2geojson $BRIDGE_FILE --lat GPS_S --lon GPS_E > $TMP_DIR/bridges.geojson
 
 node ./scripts/prep-bridge $TMP_DIR/bridges.geojson $TMP_DIR/roadnetwork.geojson
-cp $TMP_DIR/bridges.geojson ./output
+# Needed for the vector tiles.
+
+echo "Upload bridges data to S3"
+aws s3 cp $TMP_DIR/bridges.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
 
 ###############################################################################
 #
@@ -191,33 +195,65 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture-centroid.geojson $TMP_DIR/ag.shp \
   -sql "SELECT ST_Centroid(geometry), ag_bykm FROM ag"
 
 # Filter the centroids to the top 20%
-node ./scripts/filter-percentile ./.tmp/agriculture-centroid.geojson ./.tmp/agriculture-potential.geojson ag_bykm 80
+node ./scripts/filter-percentile $TMP_DIR/agriculture-centroid.geojson $TMP_DIR/agriculture-potential.geojson ag_bykm 80
 
+echo "Uploading agriculture data to S3"
+aws s3 cp $TMP_DIR/agriculture.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
+aws s3 cp $TMP_DIR/agriculture-potential.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
 
 ###############################################################################
 #
 # 6. Generate OD pair data
+#     - convert the OD shapefile to GeoJSON
+#     - convert a traffic matrix in CSV format to JSON records
 #
 
 echo "Preparing OD data..."
 
 ogr2ogr -f "GeoJSON" $TMP_DIR/od.geojson $OD_FILE
+node ./scripts/process-traffic ./source/od-pairs/traffic_matrix.csv
+# Od pairs and traffic.json are needed as a output file for the EAUL script.
 
-echo "All done preparing the OD data."
+echo "Uploading OD and traffic data to S3"
+aws s3 cp $TMP_DIR/od.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
+aws s3 cp $TMP_DIR/traffic.json s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
 
 
 ###############################################################################
 #
 # 7. Add additional properties to each of the road segments:
 #   - bridges - an array with the bridges and culverts of the road
-#   - floods - an array with max water levels for the road
+#   - flood_depths - an array with max water levels for the road
+#   - flood_lengths - an array with percent of the road flooded
 #   - length - length of the road
 #   - provinceIso - ISO code of province the roads belongs to
+#   - ruc - scale the RUC
 #
 
 echo "Add additional properties to road network..."
 
+aws s3 cp s3://$AWS_BUCKET/fluvial-pluvial/current/roadnetwork_stats-max.json $TMP_DIR
+aws s3 cp s3://$AWS_BUCKET/fluvial-pluvial/current/roadnetwork_stats-percent.json $TMP_DIR
+
 # Additional properties to be included in the roadnetwork geojson
 node ./scripts/additional-props/index.js
+
+
+###############################################################################
+#
+# 8. Converting the geojson to osm xml
+#
+
+echo "Converting RN to osm..."
+python ./libs/ogr2osm/ogr2osm.py $TMP_DIR/roadnetwork.geojson --split-ways 1 -t ./libs/ogr2osm/default_translation.py -o $TMP_DIR/roadnetwork.osm -f --positive-id
+# OSM Road Network is needed as a output file for the EAUL script.
+
+echo "Extract way IDs for other scripts to use"
+node ./scripts/utils/extract-ways $TMP_DIR
+
+echo "Uploading RN data to S3"
+aws s3 cp $TMP_DIR/roadnetwork.osm s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
+aws s3 cp $TMP_DIR/roadnetwork-osm-ways.json s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
+aws s3 cp $TMP_DIR/roadnetwork.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
 
 echo "All done preparing the base data."

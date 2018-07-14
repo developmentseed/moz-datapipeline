@@ -5,7 +5,7 @@ import Promise from 'bluebird';
 import OSRM from 'osrm';
 
 import { tStart, tEnd, jsonToFile, initLog } from '../utils/logging';
-import { runCmd, dataToCSV } from '../utils/utils';
+import { dataToCSV, createSpeedProfile, osrmContract } from '../utils/utils';
 
 /**
  * Performs the criticality analysis outputting the indicator score.
@@ -25,7 +25,6 @@ const { ROOT_DIR } = process.env;
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/criticality');
 
@@ -34,7 +33,7 @@ const WAYS_FILE = path.resolve(TMP_DIR, 'roadnetwork-osm-ways.json');
 const OSRM_FOLDER = path.resolve(TMP_DIR, 'osrm');
 
 const IND_NAME = 'criticality';
-const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
+const OUTPUT_INDICATOR_FILE = path.resolve(TMP_DIR, `indicator-${IND_NAME}.csv`);
 
 // Number of concurrent operations to run.
 const CONCURR_OPS = 5;
@@ -88,7 +87,6 @@ async function run (ways, odPairs) {
     return data;
   }, {concurrency: CONCURR_OPS});
 
-  clog('changes', result.filter(o => o.time > 0));
   clog('data length', result.length);
 
   // Calculate score (0 - 100)
@@ -203,7 +201,18 @@ async function calcTimePenaltyForWay (way, coords, benchmark) {
   await fs.copy(OSRM_FOLDER, `${TMP_DIR}/${osrmFolder}`);
   tEnd(`WAY ${way.id} clean`)();
 
-  await ignoreSegment(way, `${TMP_DIR}/${osrmFolder}`);
+  const speedProfileFile = `${TMP_DIR}/speed-${way.id}.csv`;
+
+  tStart(`[IGNORE WAYS] ${way.id} traffic profile`)();
+  await createSpeedProfile(speedProfileFile, [way]);
+  tEnd(`[IGNORE WAYS] ${way.id} traffic profile`)();
+
+  tStart(`[IGNORE WAYS] ${way.id} osm-contract`)();
+  await osrmContract(`${TMP_DIR}/${osrmFolder}`, speedProfileFile, way.id, {ROOT_DIR, LOG_DIR});
+  tEnd(`[IGNORE WAYS] ${way.id} osm-contract`)();
+
+  // Speed profile file is no longer needed.
+  fs.remove(speedProfileFile);
 
   tStart(`WAY ${way.id} osrm-table`)();
   const result = await osrmTable(`${TMP_DIR}/${osrmFolder}/roadnetwork.osrm`, {coordinates: coords}, way);
@@ -212,7 +221,6 @@ async function calcTimePenaltyForWay (way, coords, benchmark) {
   await jsonToFile(`${LOG_DIR}/ways-times/way-${way.id}-all.json`)(result);
 
   // We don't have to wait for files to be removed.
-  fs.remove(`${TMP_DIR}/speed-${way.id}.csv`);
   fs.remove(`${TMP_DIR}/${osrmFolder}`);
 
   // Start processing.
@@ -297,85 +305,9 @@ async function calcTimePenaltyForWay (way, coords, benchmark) {
   return jsonToFile(`${LOG_DIR}/ways-times/way-${way.id}.json`)(data);
 }
 
-/**
- * Ignores a segment from the RN network by setting the max travel speed
- * between all the nodes on that segment to 0.
- * Steps:
- * - Calls createSpeedProfile()
- * - Run osrm-contract on the osrm files using the created speed profile.
- *
- * @param  {object} way        Way being ignored.
- * @param  {string} osrmFolder Path to osrm folder
- *
- * @return {Promise}           Resolves with no data.
- */
-async function ignoreSegment (way, osrmFolder) {
-  const identifier = way.id;
-  const speedProfileFile = `${TMP_DIR}/speed-${identifier}.csv`;
-  const rootPath = path.resolve(__dirname, '../..');
-  // The dockerVolMount depends on whether we're running this from another docker
-  // container or directly. See docker-compose.yml for an explanantion.
-  const dockerVolMount = ROOT_DIR || rootPath;
-
-  // Paths for the files depending from where this is being run.
-  const pathOSRM = ROOT_DIR ? osrmFolder.replace(rootPath, ROOT_DIR) : osrmFolder;
-  const pathSpeedProf = ROOT_DIR ? speedProfileFile.replace(rootPath, ROOT_DIR) : speedProfileFile;
-
-  tStart(`WAY ${identifier} traffic profile`)();
-  await createSpeedProfile(speedProfileFile, way);
-  tEnd(`WAY ${identifier} traffic profile`)();
-
-  tStart(`WAY ${identifier} osm-contract`)();
-  await runCmd('docker', [
-    'run',
-    '--rm',
-    '-t',
-    '-v', `${dockerVolMount}:${dockerVolMount}`,
-    'osrm/osrm-backend:v5.16.4',
-    'osrm-contract',
-    '--segment-speed-file', pathSpeedProf,
-    `${pathOSRM}/roadnetwork.osrm`
-  ], {}, `${LOG_DIR}/osm-contract-logs/way-${way.id}.log`);
-  tEnd(`WAY ${identifier} osm-contract`)();
-}
-
-/**
- * Create a speed profile file with all the node pairs on the RN and the max
- * speed set to 0
- *
- * @param  {String} speedProfileFile Path to speed profile.
- * @param  {Object} way              Way to write profile for.
- *
- * @return Promise{}                 Resolves when file was written.
- */
-function createSpeedProfile (speedProfileFile, way) {
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(speedProfileFile);
-
-    file
-      .on('open', () => {
-        // Compute traffic profile.
-        // https://github.com/Project-OSRM/osrm-backend/wiki/Traffic
-        for (let i = 0; i < way.nodes.length - 2; i++) {
-          if (i !== 0) { file.write('\n'); }
-
-          const node = way.nodes[i];
-          const nextNode = way.nodes[i + 1];
-
-          file.write(`${node},${nextNode},0\n`);
-          file.write(`${nextNode},${node},0`);
-        }
-        file.end();
-      })
-      .on('error', err => reject(err))
-      .on('finish', () => resolve());
-  });
-}
-
 (async function main () {
   try {
     await Promise.all([
-      fs.ensureDir(OUTPUT_DIR),
       fs.ensureDir(TMP_DIR),
       fs.ensureDir(`${LOG_DIR}/ways-times`),
       fs.ensureDir(`${LOG_DIR}/osm-contract-logs`)

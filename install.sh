@@ -2,7 +2,7 @@
 
 apt-get update
 apt-get -y upgrade
-apt-get install -y gdal-bin libsqlite3-dev zlib1g-dev python-pip gdal-bin python-gdal apt-transport-https ca-certificates software-properties-common
+apt-get install -y gdal-bin libsqlite3-dev zlib1g-dev python-pip gdal-bin python-gdal apt-transport-https ca-certificates software-properties-common curl
 
 # Utils - Remove afterwards
 apt-get install -y curl git build-essential make
@@ -19,7 +19,11 @@ apt-get install -y docker-ce
 groupadd docker
 usermod -aG docker $USER
 
-# Node JS 8.x (Specific version needed because of OSRM)
+# Python tools
+pip install awscli --upgrade --user
+pip install csvkit
+
+# Node JS 8.x
 curl -sL https://deb.nodesource.com/setup_8.x | bash -
 apt-get install -y nodejs
 
@@ -38,5 +42,5 @@ make && make install
 ## Housekeeping
 cd /
 rm -rf /tmp/tippecanoe-src
-apt-get -y remove --purge git build-essential make
+apt-get -y remove --purge build-essential make
 apt-get -y autoremove

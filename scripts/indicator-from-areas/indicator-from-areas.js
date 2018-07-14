@@ -43,12 +43,11 @@ if (!AREAS_FILE || !PROPERTY || !IND_NAME) {
 // //////////////////////////////////////////////////////////
 // Config Vars
 
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
 const TMP_DIR = path.resolve(__dirname, '../../.tmp');
 const LOG_DIR = path.resolve(__dirname, '../../log/indicator-from-areas');
 
 const RN_FILE = path.resolve(TMP_DIR, 'roadnetwork.geojson');
-const OUTPUT_INDICATOR_FILE = path.resolve(OUTPUT_DIR, `indicator-${IND_NAME}.csv`);
+const OUTPUT_INDICATOR_FILE = path.resolve(TMP_DIR, `indicator-${IND_NAME}.csv`);
 
 const clog = initLog(`${LOG_DIR}/log-${Date.now()}.txt`);
 
@@ -141,7 +140,6 @@ async function run (ways, tree, indProperty) {
 (async function main () {
   try {
     await Promise.all([
-      fs.ensureDir(OUTPUT_DIR),
       fs.ensureDir(TMP_DIR),
       fs.ensureDir(LOG_DIR)
     ]);

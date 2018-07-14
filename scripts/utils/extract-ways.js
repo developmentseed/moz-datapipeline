@@ -5,12 +5,11 @@ const Osm2Obj = require('osm2obj');
 const through = require('through2');
 
 /**
- * Extract they ways from the roadnetwork osm and store them as a
- * json array. This will be used by the criticality script to look over
- * the ways to remove.
+ * Extract they ways from the roadnetwork osm and store them as a JSON array.
+ * This can be used by other scripts to efficiently look over the ways.
  *
  * Usage:
- *  $node ./scripts/criticality/extract-ways [source-dir]
+ *  $node ./scripts/utils/extract-ways [source-dir]
  *
  */
 
@@ -26,7 +25,7 @@ if (!OUTPUT_DIR) {
 
   The resulting ways index will be saves as roadnetwork-osm-ways.json.
   
-  Eg. $node ./scripts/criticality/extract-ways .tmp/`);
+  Eg. $node ./scripts/utils/extract-ways .tmp/`);
 
   process.exit(1);
 }
