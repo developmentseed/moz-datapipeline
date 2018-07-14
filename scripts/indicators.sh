@@ -27,10 +27,12 @@ if [ "$CONTROL" = false ]; then
  exit 1
 fi
 
-echo "Download road network data from S3..."
-aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork.geojson $TMP_DIR/roadnetwork.geojson
-aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork-osm-ways.json $TMP_DIR/roadnetwork-osm-ways.json
-aws s3 cp s3://$AWS_BUCKET/base_data/bridges.geojson $TMP_DIR/bridges.geojson
+echo "Download base data from S3..."
+aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork.geojson $TMP_DIR
+aws s3 cp s3://$AWS_BUCKET/base_data/roadnetwork-osm-ways.json $TMP_DIR
+aws s3 cp s3://$AWS_BUCKET/base_data/bridges.geojson $TMP_DIR
+aws s3 cp s3://$AWS_BUCKET/base_data/agriculture.geojson $TMP_DIR
+aws s3 cp s3://$AWS_BUCKET/base_data/agriculture-potential.geojson $TMP_DIR
 
 # Add source data for fishery potential to GeoJSON with district boundaries
 csvcut -c ZS_ID,ArtFiMean ./source/p2Mozambique.csv > $TMP_DIR/fisheries.csv

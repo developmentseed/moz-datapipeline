@@ -195,8 +195,11 @@ ogr2ogr -f "GeoJSON" $TMP_DIR/agriculture-centroid.geojson $TMP_DIR/ag.shp \
   -sql "SELECT ST_Centroid(geometry), ag_bykm FROM ag"
 
 # Filter the centroids to the top 20%
-node ./scripts/filter-percentile ./.tmp/agriculture-centroid.geojson ./.tmp/agriculture-potential.geojson ag_bykm 80
+node ./scripts/filter-percentile $TMP_DIR/agriculture-centroid.geojson $TMP_DIR/agriculture-potential.geojson ag_bykm 80
 
+echo "Uploading agriculture data to S3"
+aws s3 cp $TMP_DIR/agriculture.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
+aws s3 cp $TMP_DIR/agriculture-potential.geojson s3://$AWS_BUCKET/base_data/ --content-encoding gzip --acl public-read
 
 ###############################################################################
 #
