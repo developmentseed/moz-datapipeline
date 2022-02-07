@@ -2,6 +2,10 @@
 
 apt-get update
 apt-get -y upgrade
+
+export TZ=Etc/UTC
+ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 apt-get install -y gdal-bin libsqlite3-dev zlib1g-dev python-pip gdal-bin python-gdal apt-transport-https ca-certificates software-properties-common curl
 
 # Utils - Remove afterwards
@@ -24,8 +28,8 @@ pip install awscli --upgrade --user
 pip install csvkit
 
 # Node JS 8.x
-curl -sL https://deb.nodesource.com/setup_8.x | bash -
-apt-get install -y nodejs
+# curl -sL https://deb.nodesource.com/setup_8.x | bash -
+# apt-get install -y nodejs
 
 # Yarn package manager
 curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
