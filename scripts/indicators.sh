@@ -14,7 +14,7 @@ TMP_DIR=./.tmp
 export $(grep -v '^#' .env | xargs)
 
 CONTROL=true
-ENV_VARS="AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY"
+ENV_VARS="AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY TOTAL_JOBS JOB_ID ROOT_DIR"
 
 for v in $ENV_VARS; do
   if [ -z "${!v}" ]; then
